@@ -1,0 +1,10 @@
+flask
+flask-cors
+psycopg2-binary
+python-dotenv
+bcrypt
+streamlit
+PyJWT
+streamlit-aggrid
+XlsxWriter
+openpyxl
