@@ -2,63 +2,62 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-from utils.api.entity_api import insert_entity
+from utils.api.branch_api import insert_branch
 
 # Template XLSX
 def generate_template():
-    df = pd.DataFrame(columns=["id_entity", "keterangan", "koderegion"])
+    df = pd.DataFrame(columns=["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area"])
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template")
     buffer.seek(0)
     return buffer
 
-# Fungsi upload dan insert ke database 
+# UPLOAD
 def process_upload(file, username):
     try:
         df = pd.read_excel(file)
     except Exception:
         st.error("❌ File tidak valid. Pastikan file Excel benar.")
         return None
-
-    # Validasi kolom
-    required_cols = ["id_entity", "keterangan", "koderegion"]
+    
+    # VALIDASI KOLOM
+    required_cols = ["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area"]
     if not all(col in df.columns for col in required_cols):
-        st.error("Kolom harus sesuai template: entity, keterangan, koderegion")
+        st.error("Kolom harus sesuai template")
         return None
-
-    # Tambahkan metadata
+    
+    # ADD METADATA
     df["createby"] = username
     df["createdate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Kirim ke API
-    res = insert_entity(df)
+    # KIRIM DATA KE API
+    res = insert_branch(df)
     if not res:
-        st.error("Gagal terhubung ke server.")
+        st.error("Gagal terhubung ke server")
         return None
-
+    
     if res.status_code == 200:
         try:
             result_json = res.json()
         except Exception:
             st.success(f"✅ Berhasil upload {len(df)} record ke database area.")
             return {"message": f"Berhasil upload {len(df)} record ke database."}
-
         return result_json
     else:
         st.error(f"Gagal upload data: {res.text}")
         return None
     
-# Halaman Upload Region
+# HALAMAN UPLOAD BRANCH
 def app():
-    # Validasi login
+    #VALIDASI LOGIN
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠️ Anda harus login terlebih dahulu.")
         st.session_state.page = "main"
         st.rerun()
         return
-
-    # Inisialisasi state
+    
+    # INISIALISASI STATE
     if "upload_done" not in st.session_state:
         st.session_state.upload_done = False
     if "upload_result" not in st.session_state:
@@ -68,20 +67,20 @@ def app():
 
     st.title("⬆️ Upload Entity")
 
-    # Bagian Download Template 
-    st.subheader("📄 Download Template Entity")
+    # DOWNLOAD TEMPLATE
+    st.subheader("📄 Download Template Branch")
     template_file = generate_template()
     st.download_button(
-        label="Download Template XLSX",
+        label="Download Template",
         data=template_file,
-        file_name="template_entity.xlsx",
+        file_name="template_branch.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # Jika belum upload 
+    # BELUM UPLOAD
     if not st.session_state.upload_done:
         st.subheader("📤 Upload Data Entity")
-        uploaded_file = st.file_uploader("Pilih file Excel (Template Entity)", type=["xlsx"])
+        uploaded_file = st.file_uploader("Pilih file", type=["xlsx"])
 
         if uploaded_file and st.button("🚀 Upload Data"):
             with st.spinner("Sedang memproses data..."):
@@ -90,14 +89,16 @@ def app():
             if result_json:
                 st.session_state.upload_result = result_json
                 st.session_state.upload_done = True
-                st.rerun() 
+                st.rerun()
 
-    # Jika upload sudah selesai 
+    # JIKA SUDAH SELESAI
     else:
         result_json = st.session_state.upload_result
         message = result_json.get("message", "")
         duplicate_entities = result_json.get("duplicate_ids", [])
-        invalid_regions = result_json.get("invalid_koderegion", [])
+        invalid_koderegion = result_json.get("invalid_koderegion", [])
+        invalid_entity = result_json.get("invalid_entity", [])
+        invalid_area = result_json.get("invalid_area")
 
         st.success("✅ Upload selesai. Berikut hasil proses:")
         if message:
@@ -105,41 +106,14 @@ def app():
 
         rows = []
 
-        # Duplicate
+        # DUPLICATE
         for i in duplicate_entities:
             rows.append({
-                "id_entity": i,
-                "koderegion": "",
-                "Status": "Duplicate (Skipped)"
+                rows.append({
+                    "kodebranch": i,
+                    "koderegion"
+
+                })
             })
 
-        # Invalid region
-        for r in invalid_regions:
-            rows.append({
-                "id_entity": "",
-                "koderegion": r,
-                "Status": "Invalid Region (Skipped)"
-            })
-
-        if rows:
-            df_display = pd.DataFrame(rows)
-            st.warning("⚠️ Sebagian data tidak diproses. Lihat tabel di bawah.")
-            st.dataframe(df_display)
-        else:
-            st.success("Semua data berhasil ditambahkan ke database")
-
-
-          # Tombol kembali
-        st.markdown("---")
-        if st.button("⬅️ Kembali ke Data Entity"):
-            st.cache_data.clear()
-            st.session_state["refresh_entity"] = True
-            st.session_state.page = "entity"
-            st.session_state.upload_done = False
-            st.session_state.upload_result = None
-            st.rerun()
-
-
-# Jalankan langsung (opsional)
-if __name__ == "__main__":
-    app()
+        

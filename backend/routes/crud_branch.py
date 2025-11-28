@@ -55,7 +55,7 @@ def get_branch():
     total_count = total_row['total'] if total_row else 0
 
     cursor.close()
-    conn.clsoe()
+    conn.close()
     release_db_connection(conn)
 
     return jsonify({
