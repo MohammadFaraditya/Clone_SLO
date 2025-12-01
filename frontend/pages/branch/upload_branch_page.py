@@ -6,7 +6,7 @@ from utils.api.branch_api import insert_branch
 
 # Template XLSX
 def generate_template():
-    df = pd.DataFrame(columns=["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area"])
+    df = pd.DataFrame(columns=["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area", "host", "ftp_user", "ftp_password"])
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template")
@@ -22,7 +22,7 @@ def process_upload(file, username):
         return None
     
     # VALIDASI KOLOM
-    required_cols = ["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area"]
+    required_cols = ["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area", "host", "ftp_user", "ftp_password"]
     if not all(col in df.columns for col in required_cols):
         st.error("Kolom harus sesuai template")
         return None
@@ -79,7 +79,7 @@ def app():
 
     # BELUM UPLOAD
     if not st.session_state.upload_done:
-        st.subheader("📤 Upload Data Entity")
+        st.subheader("📤 Upload Data Branch")
         uploaded_file = st.file_uploader("Pilih file", type=["xlsx"])
 
         if uploaded_file and st.button("🚀 Upload Data"):
@@ -109,11 +109,66 @@ def app():
         # DUPLICATE
         for i in duplicate_entities:
             rows.append({
-                rows.append({
                     "kodebranch": i,
-                    "koderegion"
+                    "koderegion": "",
+                    "kodeentity": "",
+                    "kodearea": "",
+                    "Status" : "Duplicated(Skipped)"
 
                 })
+        
+        # INVALID REGION
+        for r in invalid_koderegion:
+            rows.append({
+                "kodebranch": "",
+                "koderegion": r,
+                "kodeentity": "",
+                "kodearea": "",
+                "Status" : "Invalid Region (Skipped)"
             })
+
+        # INVALID ENTITY 
+        for t in invalid_entity:
+            rows.append({
+                "kodebranch": "",
+                "koderegion": "",
+                "kodeentity": t,
+                "kodearea": "",
+                "Status" : "Invalid Entity (Skipped)"
+            })
+
+        # INVALID AREA
+        for y in invalid_area:
+            rows.append({
+                "kodebranch": "",
+                "koderegion": "",
+                "kodeentity": "",
+                "kodearea" : y,
+                "Status" : "Invalid Area (Skipped)"
+            })
+
+        if rows:
+            df_display = pd.DataFrame(rows)
+            st.warning("⚠️ Sebagian data tidak diproses. Lihat tabel di bawah.")
+            st.dataframe(df_display)
+        else:
+            st.success("Semua data berhasil ditambahkan ke database")
+
+
+        # BUTTON BACK
+        st.markdown("---")
+        if st.button("⬅️ Kembali ke Data Branch"):
+            st.cache_data.clear()
+            st.session_state["refresh_branch"] = True
+            st.session_state.page = "branch"
+            st.session_state.upload_done = False
+            st.session_state.upload_result = None
+            st.rerun()
+
+# Jalankan langsung (opsional)
+if __name__ == "__main__":
+    app()
+        
+
 
         

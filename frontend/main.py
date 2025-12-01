@@ -160,4 +160,8 @@ else:
         from pages.branch import branch_page
         branch_page.app()
 
+    elif st.session_state.page == "upload_branch":
+        from pages.branch import upload_branch_page
+        upload_branch_page.app()
+
     #end branch page

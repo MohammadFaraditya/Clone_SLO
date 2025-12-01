@@ -69,7 +69,7 @@ def render_grid(df):
     return updated_df, selected_rows
 
 
-# Halaman Area Page
+#Area Page
 def app():
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠️ Anda harus login terlebih dahulu.")

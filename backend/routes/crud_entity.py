@@ -65,7 +65,7 @@ def get_entity():
 #INSERT DATA ENTITY
 @entity_bp.route('/insert', methods=['POST'])
 @token_required
-def insert_region():
+def insert_entity():
     data = request.json
     if not data or not isinstance(data, list):
         return jsonify({"error": "Data tidak valid"}), 400
@@ -170,7 +170,7 @@ def update_entity_route(id_entity):
     cursor.close()
     conn.close()
     release_db_connection(conn)
-    return jsonify({"message": f"Area {id_entity} berhasil diupdate"}), 200
+    return jsonify({"message": f" Entity {id_entity} berhasil diupdate"}), 200
 
 
 #DELETE ENTITY

@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.api.branch_api import get_all_branch
+from utils.api.branch_api import get_all_branch, update_branch, delete_branch
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100
@@ -37,23 +37,26 @@ def fetch_all_branch(token):
 #RENDER GRID
 def render_grid(df):
     gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_column("No", header_name="No", width=60, pinned="left", editable=False)
-    gb.configure_column("koderegion", header_name="Kode Region", width=100, pinned="left", editable=False)
-    gb.configure_column("nama_region", header_name="Nama Region", width=150, pinned="left", editable=False)
-    gb.configure_column("entity", header_name="Entity", width=100, pinned="left", editable=False)
-    gb.configure_column("nama_entity", header_name="Nama Entity", width=150, pinned="left", editable=False)
-    gb.configure_column("kodebranch", header_name="Kode Branch", width=100, pinned="left", editable=False)
-    gb.configure_column("nama_branch", header_name="Nama Branch", width=200, pinned="left", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("alamat", header_name="Alamat", width=250, pinned="left", editable=False)
-    gb.configure_column("id_area", header_name="ID Area", width=100, pinned="left", editable=False)
-    gb.configure_column("createdate", header_name="Create Date", width=100, pinned="left", editable=False)
-    gb.configure_column("createby", header_name="Create By", width=100, pinned="left", editable=False)
-    gb.configure_column("updatedate", header_name="Update Date", width=100, pinned="left", editable=False)
-    gb.configure_column("updateby", header_name="Update By", width=100, pinned="left", editable=False)
-    gb.configure_column("host", header_name="Host", width=100, pinned="left", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("ftp_user", header_name="FTP User", width=100, pinned="left", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("ftp_password", header_name="FTP Password", width=100, pinned="left", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_selection('multiple', use_checkbox=True)
+    gb.configure_column("No", header_name="No", width=60, editable=False)
+    gb.configure_column("koderegion", header_name="Kode Region", width=100, editable=False)
+    gb.configure_column("nama_region", header_name="Nama Region", width=150, editable=False)
+    gb.configure_column("entity", header_name="Entity", width=100, editable=False)
+    gb.configure_column("nama_entity", header_name="Nama Entity", width=150, editable=False)
+    gb.configure_column("kodebranch", header_name="Kode Branch", width=100, editable=False)
+    gb.configure_column("nama_branch", header_name="Nama Branch", width=300, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("alamat", header_name="Alamat", width=250, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("id_area", header_name="ID Area", width=100, editable=False)
+    gb.configure_column("createdate", header_name="Create Date", width=100, editable=False)
+    gb.configure_column("createby", header_name="Create By", width=100, editable=False)
+    gb.configure_column("updatedate", header_name="Update Date", width=100, editable=False)
+    gb.configure_column("updateby", header_name="Update By", width=100, editable=False)
+    gb.configure_column("host", header_name="Host", width=100, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("ftp_user", header_name="FTP User", width=100, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("ftp_password", header_name="FTP Password", width=100, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_grid_options(domLayout='normal')
     grid_options = gb.build()
+    gb.configure_side_bar() 
 
     grid_response = AgGrid(
         df,
@@ -62,7 +65,7 @@ def render_grid(df):
         width='100%',
         data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
         update_mode=GridUpdateMode.VALUE_CHANGED,
-        fit_columns_on_grid_load=True,
+        fit_columns_on_grid_load=False,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=True,
         key="branch_grid_all"
@@ -85,7 +88,7 @@ def app():
     updateby = st.session_state.user['nama']
 
     if st.button("⬆️ Upload Branch"):
-        st.session_state.page = "upload_entity"
+        st.session_state.page = "upload_branch"
         st.rerun()
         return
     
@@ -111,7 +114,7 @@ def app():
     df_page["No"] = df_page["No"].astype(str)
 
     ordered_cols = [
-        "No", "koderegion","nama_branch","entity","nama_entity","kodebranch",
+        "No", "koderegion","nama_region","entity","nama_entity","kodebranch",
         "nama_branch","alamat","id_area","createdate","createby","updatedate",
         "updateby","host","ftp_user","ftp_password"
     ]
@@ -132,19 +135,74 @@ def app():
     #SIMPAN PERUBAHAN
     if st.button("💾 Simpan Perubahan"):
         success_count = 0
-        original_dict = {r["branch"]: r for r in data}
+
+        
+        original_dict = {r["kodebranch"]: r for r in data}
 
         for _, row in update_df.iterrows():
             kodebranch = row["kodebranch"]
+
+            # data original tidak ditemukan → skip
             if kodebranch not in original_dict:
                 continue
-                
+
             original_row = original_dict[kodebranch]
 
-    #DELETE         
+            # kolom yang diizinkan untuk update
+            fields = ["nama_branch", "alamat", "host", "ftp_user", "ftp_password"]
+
+            # cek apakah ada minimal 1 kolom berubah
+            is_changed = any(
+                row[field] != original_row.get(field)
+                for field in fields
+            )
+
+            # jika tidak ada perubahan → skip
+            if not is_changed:
+                continue
+
+            # lakukan update ke API backend
+            res = update_branch(
+                token,
+                kodebranch,
+                row["nama_branch"],
+                row["alamat"],
+                row["host"],
+                row["ftp_user"],
+                row["ftp_password"],
+                updateby
+            )
+
+            if res and res.status_code == 200:
+                success_count += 1
+            else:
+                st.error(f"Gagal update branch {kodebranch}")
+
+        # hasil update
+        if success_count > 0:
+            st.success(f"Berhasil memperbarui {success_count} data branch.")
+            st.session_state["refresh_branch"] = True
+            st.rerun()
+        else:
+            st.info("Tidak ada data yang berubah atau tidak ada yang berhasil diperbarui.")
+
+    #DELETE BRANCH  
     if st.button("🗑️ Hapus Data Terpilih"):
         if selected_rows.empty:
             st.warning("Pilih minimal 1 baris yang ingin dihapus dengan centang checkbox.")
+        else:
+            ids_to_delete = selected_rows["kodebranch"].tolist()
+            res = delete_branch(token, ids_to_delete)
+            if res and res.status_code == 200:
+                st.success(f"{len(ids_to_delete)} baris berhasil dihapus")
+                st.session_state["refresh_branch"] = True
+                st.rerun()
+            else:
+                try:
+                    err = res.json().get("error") or res.json().get("message") or "Gagal menghapus data"
+                except Exception:
+                    err = "Gagal menghapus data"
+                st.error(err)
 
     col1, col2, col3 = st.columns([1,2,1])
     with col1:
@@ -152,7 +210,7 @@ def app():
             st.session_state["refresh_branch"] = True
             st.rerun()
     with col2:
-        st.markdwon(
+        st.markdown(
             f"### Menampilkan {len(st.session_state['branch_data'])} / {total_rows} baris", 
                 unsafe_allow_html=True
             )

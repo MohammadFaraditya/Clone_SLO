@@ -70,7 +70,7 @@ def insert_area():
     rows =[]
     ids = []
     for row in data:
-        id_area = row.get("id_area") or row.get("id_user")
+        id_area = row.get("id_area")
         description = row.get("description")
         createby = row.get("createby")
         createdate = row.get("createdate")

@@ -32,9 +32,44 @@ def insert_branch(df, token=None):
         "Content-Type" : "application/json"
     }
     try:
-        payload = df.to_dict(orient="reccords")
+        df = df.fillna("") 
+        payload = df.to_dict(orient="records")
         response = requests.post(f"{API_URL}/branch/insert", json=payload, headers=headers)
         return response
     except Exception as e:
         st.error(f"Gagal menghubungi server: {e}")
+        return None
+
+# UPDATE BRANCH
+def update_branch(token, kodebranch, nama_branch, alamat, host, ftp_user, ftp_password, updateby):
+    if token is None:
+        token = st.session_state.get("token", None)
+    headers = {"Authorization" : token, "Content-Type": "application/json"}
+    payload = {
+        "kodebranch" : kodebranch,
+        "nama_branch" : nama_branch,
+        "alamat" : alamat,
+        "host" : host,
+        "ftp_user" : ftp_user,
+        "ftp_password" : ftp_password,
+        "updateby" : updateby
+    }
+
+    try: 
+        response = requests.put(f"{API_URL}/branch/update/{kodebranch}", json=payload, headers=headers)
+        return response
+    except Exception as e:
+        st.error(f"Gagal update branch {kodebranch} : {e}")
+        return None
+
+# DELETE BRANCH
+def delete_branch(token, kodebranch):
+    if token is None:
+        token = st.session_state.get("token", None)
+    headers = {"Authorization":token, "Content-Type": "application/json"}
+    payload = {"ids": kodebranch}
+    try:
+        return requests.delete(f"{API_URL}/branch/delete", json=payload, headers=headers)
+    except Exception as e:
+        st.error(f"Gagal hapus branch: {e}")
         return None

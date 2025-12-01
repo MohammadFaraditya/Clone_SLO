@@ -44,7 +44,7 @@ def get_branch():
         b.createby, b.updatedate, b.updateby, b.host, b.ftp_user, b.ftp_password
         FROM branch b
         INNER JOIN entity e ON b.entity = e.id_entity
-        INNER JOIN region r ON r.koderegion = r.koderegion
+        INNER JOIN region r ON r.koderegion = e.koderegion
         ORDER BY b.kodebranch
         LIMIT %s OFFSET %s
     """, (limit, offset))
@@ -72,8 +72,7 @@ def insert_branch():
     data = request.json
     if not data or not isinstance(data, list):
         return jsonify({"error": "Data tidak valid"}), 400
-    
-    #BULK INSERT
+
     rows = []
     ids = []
     koderegions = []
@@ -87,10 +86,15 @@ def insert_branch():
         entity = row.get("entity")
         alamat = row.get("alamat")
         id_area = row.get("id_area")
-        createdate = row.get("createdate")
-        createby = row.get("createby")
+        host = row.get("host")
+        ftp_user = row.get("ftp_user")
+        ftp_password = row.get("ftp_password")
 
-        rows.append((kodebranch,nama_branch,koderegion,entity,alamat,id_area,createdate,createby))
+        createdate = row.get("createdate") or datetime.now()
+        createby = row.get("createby") or "SYSTEM"
+
+        rows.append((kodebranch, nama_branch, koderegion, entity, alamat, id_area, host, ftp_user, ftp_password, createdate, createby))
+
         ids.append(kodebranch)
         koderegions.append(koderegion)
         kodeentity.append(entity)
@@ -99,61 +103,41 @@ def insert_branch():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    #CEK DUPLIKAT BRANCH
-    cur.execute(
-        "SELECT kodebranch from branch where kodebranch = ANY(%s)",
-        (ids, )
-    )
-
+    # CEK DUPLIKAT
+    cur.execute("SELECT kodebranch FROM branch WHERE kodebranch = ANY(%s)", (ids,))
     existing_rows = cur.fetchall()
-    existing_ids = [row["koderegion"] for row in existing_rows] if existing_rows else []
+    existing_ids = [row["kodebranch"] for row in existing_rows] if existing_rows else []
 
-    #CEK VALIDASI KODEREGION
-    cur.execute(
-        "SELECT koderegion from region where koderegion = ANY(%s)",
-        (koderegions, )
-    )
-
+    # CEK KODEREGION VALID
+    cur.execute("SELECT koderegion FROM region WHERE koderegion = ANY(%s)", (koderegions,))
     region_rows = cur.fetchall()
-    valid_koderegion = [row["koderegion"] for row in region_rows] if region_rows else []
+    valid_koderegion = [row["koderegion"] for row in region_rows]
 
-    #CEK VALIDASI ENTITY
-    cur.execute(
-        "SELECT id_entity from entity where entity = ANY(%s)",
-        (kodeentity, )
-    )
-
+    # CEK ENTITY VALID
+    cur.execute("SELECT id_entity FROM entity WHERE id_entity = ANY(%s)", (kodeentity,))
     entity_rows = cur.fetchall()
-    valid_entity = [row["id_entity"] for row in entity_rows] if entity_rows else []
+    valid_entity = [row["id_entity"] for row in entity_rows]
 
-    #CEK VALIDASI AREA
-    cur.execute(
-        "SELECT id_area from area where area = ANY(%s)",
-        (id_areas, )
-    )
-
+    # CEK AREA VALID
+    cur.execute("SELECT id_area FROM area WHERE id_area = ANY(%s)", (id_areas,))
     area_rows = cur.fetchall()
-    valid_area = [row['id_area'] for row in area_rows] if area_rows else []
+    valid_area = [row["id_area"] for row in area_rows]
 
-    invalid_region_rows = [r for r in rows if r[2] not in valid_koderegion]
-    invalid_entity_rows = [r for r in rows if r[3] not in valid_entity]
-    invalid_area_rows = [r for r in rows if r[5] not in valid_area]
+    # FILTER VALID ROWS
+    rows_valid = [
+        r for r in rows
+        if r[2] in valid_koderegion and r[3] in valid_entity and (r[5] in valid_area or r[5] is None)
+    ]
 
-    valid_region_rows = [r for r in rows if r[2] in valid_koderegion]
-    valid_entity_rows = [r for r in rows if r[3] in valid_entity]
-    valid_area_rows = [r for r in rows if r[5] in valid_area]
-
-    #INSERT VALID DATA
-    rows_valid = [r for r in rows if r[2] in valid_region_rows and r[3] in valid_entity_rows and r[5] in valid_area_rows]
+    # HAPUS YG DUPLIKAT
     rows_to_insert = [r for r in rows_valid if r[0] not in existing_ids]
 
     inserted_count = 0
     if rows_to_insert:
         insert_sql = """
-        INSERT INTO branch (kodebranch, nama_branch, koderegion, entity, alamat, id_area, createdate, createby)
+        INSERT INTO branch (kodebranch, nama_branch, koderegion, entity, alamat, id_area, host, ftp_user, ftp_password, createdate, createby)
         VALUES %s
         """
-
         execute_values(cur, insert_sql, rows_to_insert, page_size=500)
         inserted_count = len(rows_to_insert)
 
@@ -162,17 +146,74 @@ def insert_branch():
     release_db_connection(conn)
 
     return jsonify({
-        "message" : f"{inserted_count} record berhasil ditambahkan",
-        "duplicate_ids" : existing_ids,
-        "invalid_koderegion" : list(set([r[2] for r in invalid_region_rows])),
-        "invalid_entity" : list(set([r[3] for r in invalid_entity_rows])),
-        "invalid_area" : list(set([r[5] for r in invalid_area_rows])),
-        "skipped_invalid_region" : len(invalid_region_rows),
-        "skipped_invalid_entity" : len(invalid_entity_rows),
-        "skipped_invalid_area" : len(invalid_area_rows),
-        "skipped_duplicate" : len(existing_ids)
+        "message": f"{inserted_count} record berhasil ditambahkan",
+        "duplicate_ids": existing_ids,
+        "invalid_koderegion": list(set([r[2] for r in rows if r[2] not in valid_koderegion])),
+        "invalid_entity": list(set([r[3] for r in rows if r[3] not in valid_entity])),
+        "invalid_area": list(set([r[5] for r in rows if r[5] not in valid_area])),
+        "skipped_duplicate": len(existing_ids)
     }), 200
 
+
+# UPDATE DATA BRANCH
+@branch_bp.route('/update/<kodebranch>', methods=['PUT'])
+@token_required
+def update_branch_route(kodebranch):
+    payload = request.json
+    nama_branch = payload.get("nama_branch")
+    alamat = payload.get("alamat")
+    host = payload.get("host")
+    ftp_user = payload.get("ftp_user")
+    ftp_password = payload.get("ftp_password")
+    updateby = payload.get("updateby")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            "UPDATE branch SET nama_branch=%s, alamat=%s, host=%s, ftp_user=%s, ftp_password=%s, updatedate=%s, updateby=%s where kodebranch=%s",
+            (nama_branch, alamat, host, ftp_user, ftp_password, datetime.now(), updateby, kodebranch)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        release_db_connection(conn)
+        return jsonify({"error" : str(e)}), 500
+
+    cursor.close()
+    conn.close()
+    release_db_connection(conn)
+    return jsonify({"message": f"Branch {kodebranch} berhasil diupdate"}), 200
+
+# DELETE BRANCH
+@branch_bp.route('delete', methods=['DELETE'])
+@token_required
+def delete_entity_route():
+    payload = request.json
+    kodebranch = payload.get("ids", [])
+
+    if not kodebranch or not isinstance(kodebranch, list):
+        return jsonify({"error" : "Harus mengirim list kodebranch"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        format_strings = ",".join(["%s"] * len(kodebranch))
+        cursor.execute(f"DELETE FROM branch WHERE kodebranch IN ({format_strings})", tuple(kodebranch))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error" : str(e)}), 500
+    
+    cursor.close()
+    conn.close()
+    release_db_connection(conn)
+    return jsonify({"message" : f"{len(kodebranch)} branch berhasil dihapus"}), 200
 
 
     
