@@ -37,6 +37,7 @@ def fetch_all_branch_dist(token):
 # RENDER GRID 
 def render_grid(df):
     gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_selection('multiple', use_checkbox=True)
     gb.configure_column("No", header_name="No", width=60, pinned="left", editable=False)
     gb.configure_column("branch_dist", header_name="Branch Dist", width=150, editable=False)
     gb.configure_column("nama_branch_dist", header_name="Nama Branch Dist", width=200, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
@@ -45,7 +46,9 @@ def render_grid(df):
     gb.configure_column("createby", header_name="Create By", editable=False)
     gb.configure_column("updatedate", header_name="Update Date", editable=False)
     gb.configure_column("updateby", header_name="Update By", editable=False)
+    gb.configure_grid_options(domLayout='normal')
     grid_options = gb.build()
+    gb.configure_side_bar()
 
     grid_response = AgGrid(
         df,
@@ -96,12 +99,12 @@ def app():
         st.info("Tidak ada data branch dist yang ditemukan")
         return
         
-    st.markdown(f"**Total Data Branch Dist : {total_rows}")
+    st.markdown(f"**Total Data Branch Dist** : {total_rows}")
 
     # BUAT DATA FRAME 
     df_page = pd.DataFrame(data).reset_index(drop=True)
     df_page.insert(0, "No", range(1, len(df_page) + 1))
-    df_page["No"] = df_page["No".astype(str)]
+    df_page["No"] = df_page["No"].astype(str)
 
     ordered_cols = [
         "No", "branch_dist", "nama_branch_dist", "alamat", "createdate", "createby", "updatedate", "updateby"
@@ -124,17 +127,17 @@ def app():
     if st.button("💾 Simpan Perubahan"):
         success_count = 0
 
-        original_dict = {r["branchdist"]: r for r in data}
+        original_dict = {r["branch_dist"]: r for r in data}
 
         for _, row in updated_df.iterrows():
-            branchdist = row["branchdist"]
+            branchdist = row["branch_dist"]
 
             if branchdist not in original_dict:
                 continue
 
             original_row = original_dict[branchdist]
 
-            fields = ["nama_branch", "alamat"]
+            fields = ["nama_branch_dist", "alamat"]
 
             # PENGECEKAN APAKAH ADA PERUBAHAN
             is_changed = any(

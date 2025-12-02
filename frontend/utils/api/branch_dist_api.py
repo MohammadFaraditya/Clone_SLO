@@ -32,6 +32,7 @@ def insert_branch_dist(df, token=None):
         "Content-Type" : "application/json"
     }
     try:
+        df = df.fillna("") 
         payload = df.to_dict(orient="records")
         response = requests.post(f"{API_URL}/branch-dist/insert", json=payload, headers=headers)
         return response

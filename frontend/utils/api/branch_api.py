@@ -2,7 +2,7 @@ import requests
 import streamlit as st
 from utils.api import API_URL
 
-# GET DATA ENTITY
+# GET DATA BRANCH
 def get_all_branch(token=None, offset=0, limit=50):
     if token is None:
         token = st.session_state.get("token", None)

@@ -64,6 +64,12 @@ else:
             if st.button("🏚️ Branch", width="stretch"):
                 st.session_state.page = "branch"
                 st.rerun()
+            if st.button("🏚️ Branch Dist", width="stretch"):
+                st.session_state.page = "branch_dist"
+                st.rerun()
+            if st.button("🏚️ Mapping Branch", width="stretch"):
+                st.session_state.page = "mapping_branch"
+                st.rerun()
             st.markdown("---")
 
         st.markdown(f"""
@@ -89,7 +95,9 @@ else:
             {"title": "📍 Region", "desc": "Region", "page": "region"},
             {"title": "👥 Salesman Team", "desc": "Salesman Team", "page": "salesman_team"},
             {"title": "📍 Entity", "desc": "", "page": "entity"},
-            {"title": "🏚️ Branch", "desc": "", "page": "branch"}
+            {"title": "🏚️ Branch", "desc": "", "page": "branch"},
+            {"title": "🏚️ Branch Dist", "desc": "", "page": "branch_dist"},
+            {"title": "🏚️ Mapping Branch", "desc": "", "page": "mapping_branch"}
         ]
 
         cols = st.columns(3)
@@ -163,5 +171,24 @@ else:
     elif st.session_state.page == "upload_branch":
         from pages.branch import upload_branch_page
         upload_branch_page.app()
-
     #end branch page
+
+    #start branch_dist page
+    elif st.session_state.page == "branch_dist":
+        from pages.branch_dist import branch_dist_page
+        branch_dist_page.app()
+
+    elif st.session_state.page == "upload_branch_dist":
+        from pages.branch_dist import upload_branch_dist_page
+        upload_branch_dist_page.app()
+    #end branch_dist page
+
+     #start mapping_branch page
+    elif st.session_state.page == "mapping_branch":
+        from pages.mapping_branch import mapping_branch_page
+        mapping_branch_page.app()
+
+    elif st.session_state.page == "upload_mapping_branch":
+        from pages.mapping_branch import upload_mapping_branch_page
+        upload_mapping_branch_page.app()
+    #end mapping branch page
