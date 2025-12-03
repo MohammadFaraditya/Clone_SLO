@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.api.branch_api import get_all_branch, update_branch, delete_branch
+from utils.api.area.branch_api import get_all_branch, update_branch, delete_branch
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100

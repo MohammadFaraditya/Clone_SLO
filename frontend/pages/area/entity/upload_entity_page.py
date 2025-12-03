@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-from utils.api.salesman_team_api import insert_salesman_team
+from utils.api.area.entity_api import insert_entity
 
-# Fungsi buat template XLSX
+# Template XLSX
 def generate_template():
-    df = pd.DataFrame(columns=["id", "description"])
+    df = pd.DataFrame(columns=["id_entity", "keterangan", "koderegion"])
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template")
@@ -22,9 +22,9 @@ def process_upload(file, username):
         return None
 
     # Validasi kolom
-    required_cols = ["id", "description"]
+    required_cols = ["id_entity", "keterangan", "koderegion"]
     if not all(col in df.columns for col in required_cols):
-        st.error("Kolom harus sesuai template: id, description")
+        st.error("Kolom harus sesuai template: entity, keterangan, koderegion")
         return None
 
     # Tambahkan metadata
@@ -32,7 +32,7 @@ def process_upload(file, username):
     df["createdate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Kirim ke API
-    res = insert_salesman_team(df)
+    res = insert_entity(df)
     if not res:
         st.error("Gagal terhubung ke server.")
         return None
@@ -49,7 +49,7 @@ def process_upload(file, username):
         st.error(f"Gagal upload data: {res.text}")
         return None
     
-# Halaman Upload Salesman Team
+# Halaman Upload Region
 def app():
     # Validasi login
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
@@ -66,22 +66,22 @@ def app():
 
     username = st.session_state.user["nama"]
 
-    st.title("⬆️ Upload Salesman Team")
+    st.title("⬆️ Upload Entity")
 
     # Bagian Download Template 
-    st.subheader("📄 Download Template Salesman Team")
+    st.subheader("📄 Download Template Entity")
     template_file = generate_template()
     st.download_button(
         label="Download Template XLSX",
         data=template_file,
-        file_name="template_salesman_team.xlsx",
+        file_name="template_entity.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
     # Jika belum upload 
     if not st.session_state.upload_done:
-        st.subheader("📤 Upload Data Salesman Team")
-        uploaded_file = st.file_uploader("Pilih file Excel (Template Region)", type=["xlsx"])
+        st.subheader("📤 Upload Data Entity")
+        uploaded_file = st.file_uploader("Pilih file Excel (Template Entity)", type=["xlsx"])
 
         if uploaded_file and st.button("🚀 Upload Data"):
             with st.spinner("Sedang memproses data..."):
@@ -96,32 +96,45 @@ def app():
     else:
         result_json = st.session_state.upload_result
         message = result_json.get("message", "")
-        duplicate_ids = result_json.get("duplicate_ids", [])
+        duplicate_entities = result_json.get("duplicate_ids", [])
+        invalid_regions = result_json.get("invalid_koderegion", [])
 
         st.success("✅ Upload selesai. Berikut hasil proses:")
         if message:
             st.info(message)
 
-        # Tampilkan hasil jika ada duplikasi
-        if duplicate_ids:
-            st.warning("Beberapa data sudah ada di database dan dilewati.")
-            df_display = pd.DataFrame(
-                [{"ID": i, "Status": "Skipped"} for i in duplicate_ids]
-            )
+        rows = []
 
-            def highlight_row(row):
-                return ["" if row["Status"] == "Skipped" else ""] * len(row)
+        # Duplicate
+        for i in duplicate_entities:
+            rows.append({
+                "id_entity": i,
+                "koderegion": "",
+                "Status": "Duplicate (Skipped)"
+            })
 
-            st.dataframe(df_display.style.apply(highlight_row, axis=1))
+        # Invalid region
+        for r in invalid_regions:
+            rows.append({
+                "id_entity": "",
+                "koderegion": r,
+                "Status": "Invalid Region (Skipped)"
+            })
+
+        if rows:
+            df_display = pd.DataFrame(rows)
+            st.warning("⚠️ Sebagian data tidak diproses. Lihat tabel di bawah.")
+            st.dataframe(df_display)
         else:
-            st.success("Semua data berhasil ditambahkan ke database.")
+            st.success("Semua data berhasil ditambahkan ke database")
 
-        # Tombol kembali
+
+          # Tombol kembali
         st.markdown("---")
-        if st.button("⬅️ Kembali ke Data Salesman Team"):
+        if st.button("⬅️ Kembali ke Data Entity"):
             st.cache_data.clear()
-            st.session_state["refresh_salesman_team"] = True
-            st.session_state.page = "salesman_team"
+            st.session_state["refresh_entity"] = True
+            st.session_state.page = "entity"
             st.session_state.upload_done = False
             st.session_state.upload_result = None
             st.rerun()

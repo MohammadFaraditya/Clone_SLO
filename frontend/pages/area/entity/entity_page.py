@@ -1,25 +1,25 @@
 import streamlit as st
 import pandas as pd
-from utils.api.salesman_team_api import get_all_team, update_salesman_team, delete_salesman_team
+from utils.api.area.entity_api import get_all_entity, update_entity, delete_entity
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
-PAGE_CHUNK = 100  
+PAGE_CHUNK = 100
 
-# Fetch semua data region
-def fetch_all_team(token):
+# Fetch semua data entity
+def fetch_all_entity(token):
     all_data = []
     offset = 0
     limit = PAGE_CHUNK
 
-    while True:
-        res = get_all_team(token, offset=offset, limit=limit)
+    while True: 
+        res = get_all_entity(token, offset=offset, limit=limit)
         if not res:
             break
         if res.status_code != 200:
             try:
-                err = res.json().get("error") or res.json().get("message") or "Gagal memuat data salesman team."
+                err = res.json().get("error") or res.json().get("message") or "Gagal memuat data entity."
             except Exception:
-                err = "Gagal memuat data salesman team."
+                err = "Gagal memuat data entity"
             st.error(err)
             break
 
@@ -34,13 +34,14 @@ def fetch_all_team(token):
 
     return all_data, len(all_data)
 
-
 # Render grid dengan checkbox
-def render_grid(df):
+def render_grid(df): 
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_column("No", header_name="No", width=60, pinned="left", editable=False)
-    gb.configure_column("id", header_name="ID", width=150, editable=False)
-    gb.configure_column("description", header_name="DESCRIPTION", width=250, editable=True)
+    gb.configure_column("koderegion", header_name="Region", width=150, editable=False)
+    gb.configure_column("nama_region", header_name="Nama Region", width=200, editable=False)
+    gb.configure_column("id_entity", header_name="Entity", width=150, editable=False)
+    gb.configure_column("keterangan", header_name="Nama Entity", width=200, editable=True)
     gb.configure_column("createdate", header_name="Created Date", editable=False)
     gb.configure_column("createby", header_name="Create By", editable=False)
     gb.configure_column("updatedate", header_name="Update Date", editable=False)
@@ -61,46 +62,46 @@ def render_grid(df):
         fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=True,
-        key="salesman_team_grid_all"
+        key="entity_grid_all"
     )
 
-    updated_df = pd.DataFrame(grid_response['data']).drop(columns=["No"], errors='ignore')
+    update_df = pd.DataFrame(grid_response['data']).drop(columns=["No"], errors='ignore')
     selected_rows = pd.DataFrame(grid_response['selected_rows']).drop(columns=["No"], errors='ignore')
-    return updated_df, selected_rows
+    return update_df,selected_rows
 
-# Halaman Region Page
+# Halaman Entity Page
 def app():
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠️ Anda harus login terlebih dahulu.")
         st.session_state.page = "main"
         return
 
-    st.title("👥 Data Salesman team")
+    st.title("📍 Data Entity")
 
     token = st.session_state.token
     updateby = st.session_state.user['nama']
 
-    if st.button("⬆️ Upload Salesman Team"):
-        st.session_state.page = "upload_salesman_team"
+    if st.button("⬆️ Upload Entity"):
+        st.session_state.page = "upload_entity"
         st.rerun()
         return
 
     # Refresh data hanya jika belum ada atau flag refresh aktif
-    if "salesman_team_data" not in st.session_state or st.session_state.get("refresh_salesman_team", True):
-        with st.spinner("Memuat semua data salesman team..."):
-            all_data, total_count = fetch_all_team(token)
-            st.session_state["salesman_team_data"] = all_data
-            st.session_state["salesman_team_total"] = total_count
-            st.session_state["refresh_salesman_team"] = False
+    if "entity_data" not in st.session_state or st.session_state.get("refresh_entity", True):
+        with st.spinner("Memuat semua data entity..."):
+            all_data, total_count = fetch_all_entity(token)
+            st.session_state["entity_data"] = all_data
+            st.session_state["entity_total"] = total_count
+            st.session_state["refresh_entity"] = False
 
-    data = st.session_state.get("salesman_team_data", [])
-    total_rows = st.session_state.get("salesman_team_total", len(data))
+    data = st.session_state.get("entity_data", [])
+    total_rows = st.session_state.get("entity_total", len(data))
 
     if not data:
-        st.info("Tidak ada data salesman team yang ditemukan.")
+        st.info("Tidak ada data entity yang ditemukan.")
         return
 
-    st.markdown(f"**Total Data salesman team: {total_rows}**")
+    st.markdown(f"**Total Data Entity: {total_rows}**")
 
     # Buat DataFrame lengkap
     df_page = pd.DataFrame(data).reset_index(drop=True)
@@ -108,7 +109,7 @@ def app():
     df_page["No"] = df_page["No"].astype(str)
 
     ordered_cols = [
-        "No", "id", "description",
+        "No", "koderegion", "nama_region", "id_entity", "keterangan",
         "createdate", "createby", "updatedate", "updateby"
     ]
     df_page = df_page[[col for col in ordered_cols if col in df_page.columns]]
@@ -117,41 +118,34 @@ def app():
     st.download_button(
         label="⬇️ Download CSV (Semua Data)",
         data=csv,
-        file_name="salesman_team_data_all.csv",
+        file_name="entity_data_all.csv",
         mime="text/csv"
     )
 
-# Tampilkan grid
+    # Tampilkan grid
     updated_df, selected_rows = render_grid(df_page)
 
     # Tombol Simpan Perubahan 
     if st.button("💾 Simpan Perubahan"):
         success_count = 0
-        original_dict = {r["id"]: r for r in data}
+        original_dict = {r["id_entity"]: r for r in data}
 
-        for idx, row in updated_df.iterrows():
-            kode = row.get("id")
-            if not kode:
+        for _, row in updated_df.iterrows():
+            id_entity = row["id_entity"]
+            if id_entity not in original_dict:
                 continue
 
-            original_row = original_dict.get(kode, {})
+            original_row = original_dict[id_entity]
 
-            keterangan_changed = str(row.get("description", "")) != str(original_row.get("description", ""))
+            if row["keterangan"] != original_row.get("keterangan"):
+                res = update_entity(token, id_entity, row["keterangan"], updateby)
 
-            if keterangan_changed:
-                res = update_salesman_team(token, kode, row.get("description", ""), updateby)
                 if res and res.status_code == 200:
                     success_count += 1
-                else:
-                    try:
-                        err = res.json().get("error") or res.json().get("message") or "Gagal memperbarui data."
-                    except Exception:
-                        err = "Gagal memperbarui data."
-                    st.error(f"[{kode}] {err}")
 
         if success_count > 0:
             st.success(f"{success_count} data berhasil diperbarui!")
-            st.session_state["refresh_salesman_team"] = True
+            st.session_state["refresh_entity"] = True
             st.rerun()
         else:
             st.info("Tidak ada perubahan yang perlu disimpan.")
@@ -162,11 +156,11 @@ def app():
         if selected_rows.empty:
             st.warning("Pilih minimal 1 baris yang ingin dihapus dengan centang checkbox.")
         else:
-            ids_to_delete = selected_rows["id"].tolist()
-            res = delete_salesman_team(token, ids_to_delete)
+            ids_to_delete = selected_rows["id_entity"].tolist()
+            res = delete_entity(token, ids_to_delete)
             if res and res.status_code == 200:
                 st.success(f"{len(ids_to_delete)} baris berhasil dihapus!")
-                st.session_state["refresh_salesman_team"] = True
+                st.session_state["refresh_entity"] = True
                 st.rerun()
             else:
                 try:
@@ -179,11 +173,11 @@ def app():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
         if st.button("🔄 Segarkan Data"):
-            st.session_state["refresh_salesman_team"] = True
+            st.session_state["refresh_entity"] = True
             st.rerun()
     with col2:
         st.markdown(
-            f"### Menampilkan {len(st.session_state['salesman_team_data'])} / {total_rows} baris",
+            f"### Menampilkan {len(st.session_state['entity_data'])} / {total_rows} baris",
             unsafe_allow_html=True
         )
     with col3:

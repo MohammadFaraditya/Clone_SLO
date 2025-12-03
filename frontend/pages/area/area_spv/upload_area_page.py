@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-from utils.api.area_api import insert_areas
+from utils.api.area.area_api import insert_areas
 
 
 # Fungsi buat template XLSX

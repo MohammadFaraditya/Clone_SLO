@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-from utils.api.branch_api import insert_branch
+from utils.api.salesman.salesman_master_api import insert_salesman_master
 
 # Template XLSX
 def generate_template():
-    df = pd.DataFrame(columns=["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area", "host", "ftp_user", "ftp_password"])
+    df = pd.DataFrame(columns=["id_salesman", "nama", "id_team","kodebranch"])
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template")
@@ -22,7 +22,7 @@ def process_upload(file, username):
         return None
     
     # VALIDASI KOLOM
-    required_cols = ["kodebranch", "nama_branch", "koderegion","entity", "alamat", "id_area", "host", "ftp_user", "ftp_password"]
+    required_cols = ["id_salesman", "nama", "id_team","kodebranch"]
     if not all(col in df.columns for col in required_cols):
         st.error("Kolom harus sesuai template")
         return None
@@ -32,7 +32,7 @@ def process_upload(file, username):
     df["createdate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # KIRIM DATA KE API
-    res = insert_branch(df)
+    res = insert_salesman_master(df)
     if not res:
         st.error("Gagal terhubung ke server")
         return None
@@ -65,7 +65,7 @@ def app():
 
     username = st.session_state.user["nama"]
 
-    st.title("⬆️ Upload Entity")
+    st.title("⬆️ Upload Salesman Master")
 
     # DOWNLOAD TEMPLATE
     st.subheader("📄 Download Template Branch")
@@ -73,13 +73,13 @@ def app():
     st.download_button(
         label="Download Template",
         data=template_file,
-        file_name="template_branch.xlsx",
+        file_name="template_salesman_master.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
     # BELUM UPLOAD
     if not st.session_state.upload_done:
-        st.subheader("📤 Upload Data Branch")
+        st.subheader("📤 Upload Data Salesman Master")
         uploaded_file = st.file_uploader("Pilih file", type=["xlsx"])
 
         if uploaded_file and st.button("🚀 Upload Data"):
@@ -96,9 +96,8 @@ def app():
         result_json = st.session_state.upload_result
         message = result_json.get("message", "")
         duplicate_entities = result_json.get("duplicate_ids", [])
-        invalid_koderegion = result_json.get("invalid_koderegion", [])
-        invalid_entity = result_json.get("invalid_entity", [])
-        invalid_area = result_json.get("invalid_area")
+        invalid_id_team = result_json.get("invalid_id_team", [])
+        invalid_kodebranch = result_json.get("invalid_kodebranch", [])
 
         st.success("✅ Upload selesai. Berikut hasil proses:")
         if message:
@@ -109,43 +108,32 @@ def app():
         # DUPLICATE
         for i in duplicate_entities:
             rows.append({
-                    "kodebranch": i,
-                    "koderegion": "",
-                    "kodeentity": "",
+                    "id_salesman": i,
+                    "id_team": "",
+                    "kode_branch": "",
                     "kodearea": "",
                     "Status" : "Duplicated(Skipped)"
 
                 })
         
         # INVALID REGION
-        for r in invalid_koderegion:
+        for r in invalid_id_team:
             rows.append({
-                "kodebranch": "",
-                "koderegion": r,
-                "kodeentity": "",
-                "kodearea": "",
-                "Status" : "Invalid Region (Skipped)"
+                "id_salesman": "",
+                "id_team": r,
+                "kode_branch": "",
+                "Status" : "Invalid ID Team (Skipped)"
             })
 
         # INVALID ENTITY 
-        for t in invalid_entity:
+        for t in invalid_kodebranch:
             rows.append({
-                "kodebranch": "",
-                "koderegion": "",
-                "kodeentity": t,
-                "kodearea": "",
-                "Status" : "Invalid Entity (Skipped)"
+                "id_salesman": "",
+                "id_team": "",
+                "kode_branch": t,
+                "Status" : "Invalid kode_branch (Skipped)"
             })
 
-        # INVALID AREA
-        for y in invalid_area:
-            rows.append({
-                "kodebranch": "",
-                "koderegion": "",
-                "kodeentity": "",
-                "kodearea" : y,
-                "Status" : "Invalid Area (Skipped)"
-            })
 
         if rows:
             df_display = pd.DataFrame(rows)
@@ -157,10 +145,10 @@ def app():
 
         # BUTTON BACK
         st.markdown("---")
-        if st.button("⬅️ Kembali ke Data Branch"):
+        if st.button("⬅️ Kembali ke Data Salesman Master"):
             st.cache_data.clear()
-            st.session_state["refresh_branch"] = True
-            st.session_state.page = "branch"
+            st.session_state["refresh_salesman_master"] = True
+            st.session_state.page = "salesman_master"
             st.session_state.upload_done = False
             st.session_state.upload_result = None
             st.rerun()

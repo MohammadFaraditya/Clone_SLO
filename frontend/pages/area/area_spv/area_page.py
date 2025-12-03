@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.api.area_api import get_all_areas, update_area, delete_areas
+from utils.api.area.area_api import get_all_areas, update_area, delete_areas
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100  
