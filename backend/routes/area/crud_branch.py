@@ -208,6 +208,7 @@ def delete_entity_route():
         conn.rollback()
         cursor.close()
         conn.close()
+        release_db_connection(conn)
         return jsonify({"error" : str(e)}), 500
     
     cursor.close()

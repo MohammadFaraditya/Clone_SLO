@@ -98,7 +98,7 @@ def render_grid(df):
         update_mode=GridUpdateMode.VALUE_CHANGED,
         enable_enterprise_modules=True,
         fit_columns_on_grid_load=False,
-        key="salesman_master_grid"
+        key=f"salesman_master_grid_{st.session_state.grid_version}"
     )
 
     updated_df = pd.DataFrame(grid_response["data"])
@@ -115,6 +115,9 @@ def app():
         st.warning("⚠ Anda harus login terlebih dahulu.")
         st.session_state.page = "main"
         return
+    
+    if "grid_version" not in st.session_state:
+        st.session_state.grid_version = 1
 
     st.title("👥 Salesman Master")
     token = st.session_state.token
@@ -211,7 +214,7 @@ def app():
 
             original_dict = {str(r["id_salesman"]): r for r in st.session_state["salesman_master_display"]}
 
-            updateby = st.session_state.get("username", "system")
+            updateby = st.session_state.user['nama']
 
             for _, row in updated_df.iterrows():
                 sid = str(row["id_salesman"])
@@ -243,7 +246,8 @@ def app():
                 if kodebranch:
                     data = fetch_all_salesman_data(token, kodebranch)
                     st.session_state["salesman_master_display"] = data
-
+                
+                st.session_state.grid_version += 1
                 st.rerun()
             else:
                 st.info("Tidak ada perubahan yang disimpan.")
@@ -265,6 +269,7 @@ def app():
                         data = fetch_all_salesman_data(token, kodebranch)
                         st.session_state["salesman_master_display"] = data
 
+                    st.session_state.grid_version += 1
                     st.rerun()
                 else:
                     st.error("Gagal menghapus data")

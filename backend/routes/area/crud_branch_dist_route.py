@@ -23,7 +23,7 @@ def token_required(f):
     return decorated
 
 # GET DATA BRANCH DIST
-@branch_dist_bp.route('/data', mehods=['GET'])
+@branch_dist_bp.route('/data', methods=['GET'])
 @token_required
 def get_branch_dist():
     try:
@@ -67,11 +67,11 @@ def get_branch_dist():
 def insert_branch_dist():
     data = request.json
     if not data or not isinstance(data, list):
-        return jsonify({"error" : "Data tidak valid"}), 400
-    
-    # BULK INSERT
+        return jsonify({"error": "Data tidak valid"}), 400
+
     rows = []
     ids = []
+
     for row in data:
         branch_dist = row.get("branch_dist")
         nama_branch_dist = row.get("nama_branch_dist")
@@ -79,23 +79,28 @@ def insert_branch_dist():
         createby = row.get("createby")
         createdate = row.get("createdate")
 
-        rows.append((branch_dist, nama_branch_dist, alamat, createdate, createby))
-        ids.append(branch_dist)
-    
+        rows.append((str(branch_dist), nama_branch_dist, alamat, createdate, createby))
+        ids.append(str(branch_dist))
+
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # CEK DUPLIKAT
-    cur.execute(
-        "SELECT branch_dist FROM branch_dist where branch_dist = ANY(%s)",
-        (ids, )
-    )
+    if ids:  
+        format_strings = ",".join(["%s"] * len(ids))
+        cur.execute(
+            f"SELECT branch_dist FROM branch_dist WHERE branch_dist IN ({format_strings})",
+            tuple(ids)
+        )
+        existing_rows = cur.fetchall()
+    else:
+        existing_rows = []
 
-    existing_rows = cur.fetchall()
-    existing_ids = [row["branch_dist"] for row in existing_rows] if existing_rows else []
+    existing_ids = [r["branch_dist"] for r in existing_rows] if existing_rows else []
 
+    # Filter hanya yang belum ada
     rows_to_insert = [r for r in rows if r[0] not in existing_ids]
 
+    # Insert jika ada data baru
     inserted_count = 0
     if rows_to_insert:
         insert_sql = """
@@ -109,15 +114,14 @@ def insert_branch_dist():
     cur.close()
     release_db_connection(conn)
 
-    # PESAN HASIL INSERT
     if existing_ids:
         return jsonify({
-            "message" : f"{inserted_count} record berhasil ditambahkan, {len(existing_ids)} recoed ditolak (sudah ada di database)",
-            "duplicate_ids" : existing_ids
+            "message": f"{inserted_count} record berhasil ditambahkan, {len(existing_ids)} record ditolak (sudah ada)",
+            "duplicate_ids": existing_ids
         }), 200
-    else: return jsonify({
-        "message" : f"Semua {inserted_count} record berhasil ditambahkan"
-    }), 200
+    else:
+        return jsonify({"message": f"Semua {inserted_count} record berhasil ditambahkan"}), 200
+    
 
 # UPDATE BRANCH DIST
 @branch_dist_bp.route('/update/<branch_dist>', methods=['PUT'])
@@ -149,7 +153,7 @@ def update_branch_dist_route(branch_dist):
     return jsonify({"message" : f"Branch_Dist {branch_dist} berhasil diupdate"}), 200
 
 # DELETE AREA
-@branch_dist_bp.route('\delete', methods=['DELETE'])
+@branch_dist_bp.route('/delete', methods=['DELETE'])
 @token_required
 def delete_branch_dist_route():
     payload = request.json
