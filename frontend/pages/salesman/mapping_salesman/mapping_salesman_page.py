@@ -1,23 +1,23 @@
 import streamlit as st
 import pandas as pd
-from utils.api.salesman.salesman_master_api import (
-    get_all_salesman_master,
+from utils.api.salesman.mapping_salesman_api import (
+    get_all_mapping_salesman,
     get_region_entity_branch_mapping,
-    update_salesman_master,
-    delete_salesman_master
+    update_mapping_salesman,
+    delete_mapping_salesman
 )
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100
 
 # FETCH DATA PAGINATION
-def fetch_all_salesman_data(token, kodebranch=None):
+def fetch_all_mapping_salesman(token, kodebranch=None):
     all_data = []
     offset = 0
     limit = PAGE_CHUNK
 
     while True:
-        res = get_all_salesman_master(
+        res = get_all_mapping_salesman(
             token, offset=offset, limit=limit, kodebranch=kodebranch
         )
 
@@ -40,29 +40,31 @@ def fetch_all_salesman_data(token, kodebranch=None):
 # RENDER GRID
 def render_grid(df):
     df = df.copy()
-
     ordered_columns = [
+        "kodebranch",
         "id_salesman",
         "nama",
-        "id_team",
-        "salesman_team",
-        "kodebranch",
-        "nama_branch",
+        "id_salesman_dist",
+        "nama_salesman_dist",
         "createdate",
         "createby",
         "updatedate",
         "updateby"
     ]
 
+    # pastikan semua kolom yang di-order ada di df, bila tidak ada buat kolom kosong agar indexing tidak error
+    for col in ordered_columns:
+        if col not in df.columns:
+            df[col] = ""
+
     df = df[ordered_columns]
 
     columnDefs = [
-        {"field": "id_salesman", "checkboxSelection": True, "headerCheckboxSelection": True},
-        {"field": "nama", "editable": True,
-         "cellStyle": {"backgroundColor": "#E2EAF4"}},   # warna kolom editable
-        {"field": "id_team"},
-        {"field": "salesman_team"},
-        {"field": "kodebranch"},
+        {"field": "kodebranch", "checkboxSelection": True, "headerCheckboxSelection": True},
+        {"field": "id_salesman"},
+        {"field": "nama"},
+        {"field": "id_salesman_dist","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
+        {"field": "nama_salesman_dist","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
         {"field": "nama_branch"},
         {"field": "createdate"},
         {"field": "createby"},
@@ -91,7 +93,7 @@ def render_grid(df):
         update_mode=GridUpdateMode.VALUE_CHANGED,
         enable_enterprise_modules=True,
         fit_columns_on_grid_load=False,
-        key=f"salesman_master_grid_{st.session_state.grid_version}"
+        key=f"mapping_salesman_grid_{st.session_state.grid_version}"
     )
 
     updated_df = pd.DataFrame(grid_response["data"])
@@ -110,21 +112,21 @@ def app():
     if "grid_version" not in st.session_state:
         st.session_state.grid_version = 1
 
-    st.title("👥 Salesman Master")
+    st.title("👥 Mapping Salesman")
     token = st.session_state.token
+    updateby = st.session_state.user['nama']
 
-    # AUTO REFRESH SAAT KEMBALI DARI UPLOAD
-    if st.session_state.get("refresh_salesman_master"):
-        st.session_state.refresh_salesman_master = False
+    if st.session_state.get("refresh_mapping_salesman"):
+        st.session_state.refresh_mapping_salesman = False 
 
         kodebranch = st.session_state.get("last_kodebranch")
         if kodebranch:
             with st.spinner("Memuat ulang data setelah upload..."):
-                data = fetch_all_salesman_data(token, kodebranch)
+                data = fetch_all_mapping_salesman(token, kodebranch)
 
-            st.session_state["salesman_master_display"] = data
+            st.session_state["mapping_salesman_display"] = data
             st.session_state.grid_version += 1
-            st.success(f"Data diperbarui otomatis (Branch: {kodebranch})")
+            st.success(f"Data berhasil diperbarui (Branch: {kodebranch})")
 
     # LOAD MAPPING REGION/ENTITY/BRANCH
     if "mapping" not in st.session_state:
@@ -142,8 +144,8 @@ def app():
         st.session_state.filter_expander_open = True
 
     # BUTTON UPLOAD
-    if st.button("⬆️ Upload Salesman Master"):
-        st.session_state.page = "upload_salesman_master"
+    if st.button("⬆️ Upload Mapping Salesman"):
+        st.session_state.page = "upload_mapping_salesman"
         st.rerun()
         return
 
@@ -191,16 +193,16 @@ def app():
                 kodebranch = selected_branch.split(" - ")[0]
                 st.session_state["last_kodebranch"] = kodebranch 
                 with st.spinner("Mengambil data salesman..."):
-                    data = fetch_all_salesman_data(token, kodebranch)
+                    data = fetch_all_mapping_salesman(token, kodebranch)
 
-                st.session_state["salesman_master_display"] = data
+                st.session_state["mapping_salesman_display"] = data
                 st.success(f"Berhasil memuat {len(data)} data!")
 
 
     # DISPLAY GRID
-    if "salesman_master_display" in st.session_state and st.session_state["salesman_master_display"]:
+    if "mapping_salesman_display" in st.session_state and st.session_state["mapping_salesman_display"]:
 
-        df = pd.DataFrame(st.session_state["salesman_master_display"])
+        df = pd.DataFrame(st.session_state["mapping_salesman_display"])
         df.insert(0, "No", range(1, len(df) + 1))
 
         updated_df, selected_rows = render_grid(df)
@@ -208,11 +210,11 @@ def app():
         st.markdown("---")
 
         #  BUTTON SIMPAN PERUBAHAN
+
         if st.button("💾 Simpan Perubahan"):
             success = 0
 
-            original_dict = {str(r["id_salesman"]): r for r in st.session_state["salesman_master_display"]}
-
+            original_dict = {str(r["id_salesman"]): r for r in st.session_state["mapping_salesman_display"]}
             updateby = st.session_state.user['nama']
 
             for _, row in updated_df.iterrows():
@@ -223,48 +225,59 @@ def app():
 
                 original_row = original_dict[sid]
 
-                # hanya kolom nama yang editable
-                if row["nama"] != original_row.get("nama"):
+                # kolom yang boleh diedit
+                changed = (
+                    row["id_salesman_dist"] != original_row.get("id_salesman_dist") or
+                    row["nama_salesman_dist"] != original_row.get("nama_salesman_dist")
+                )
 
-                    res = update_salesman_master(
-                        token,
-                        sid,
-                        row["nama"],
-                        updateby
-                    )
+                if not changed:
+                    continue
 
-                    if res and res.status_code == 200:
-                        success += 1
-                    else:
-                        st.error(f"Gagal update salesman {sid}")
+                res = update_mapping_salesman(
+                    token,
+                    sid,
+                    row["id_salesman_dist"],
+                    row["nama_salesman_dist"],
+                    updateby
+                )
+
+                if res and res.status_code == 200:
+                    success += 1
+                else:
+                    st.error(f"Gagal update mapping salesman {sid}")
 
             if success > 0:
-                st.success(f"Berhasil update {success} data salesman")
+                st.success(f"Berhasil update {success} data mapping salesman")
+
+                # REFRESH DATA seperti di salesman_master_page.py
                 kodebranch = st.session_state.get("last_kodebranch")
 
                 if kodebranch:
-                    data = fetch_all_salesman_data(token, kodebranch)
-                    st.session_state["salesman_master_display"] = data
-                
+                    data = fetch_all_mapping_salesman(token, kodebranch)
+                    st.session_state["mapping_salesman_display"] = data
+
                 st.session_state.grid_version += 1
                 st.rerun()
             else:
                 st.info("Tidak ada perubahan yang disimpan.")
 
-        # HAPUS DATA TERPILIH
+        #DELETE BRANCH  
         if st.button("🗑️ Hapus Data Terpilih"):
             if selected_rows.empty:
                 st.warning("⚠ Centang minimal satu baris")
             else:
                 ids = selected_rows["id_salesman"].astype(str).tolist()
-                res = delete_salesman_master(token, ids)
+                res = delete_mapping_salesman(token, ids)
 
                 if res and res.status_code == 200:
                     st.success(f"{len(ids)} data berhasil dihapus")
+
+                    # REFRESH DATA seperti di salesman_master_page.py
                     kodebranch = st.session_state.get("last_kodebranch")
                     if kodebranch:
-                        data = fetch_all_salesman_data(token, kodebranch)
-                        st.session_state["salesman_master_display"] = data
+                        data = fetch_all_mapping_salesman(token, kodebranch)
+                        st.session_state["mapping_salesman_display"] = data
 
                     st.session_state.grid_version += 1
                     st.rerun()

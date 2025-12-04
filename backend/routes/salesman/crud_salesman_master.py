@@ -210,7 +210,7 @@ def update_branch_route(id_salesman):
     return jsonify({"message": f"ID Salesman {id_salesman} berhasil diupdate"}), 200
 
 # DELETE SALESMAN MASTER
-@salesman_master_bp.route('delete', methods=['DELETE'])
+@salesman_master_bp.route('/delete', methods=['DELETE'])
 @token_required
 def delete_entity_route():
     payload = request.json

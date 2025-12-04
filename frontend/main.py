@@ -34,6 +34,7 @@ st.markdown("""
     .sidebar-space {
         height: 6px;
     }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -112,6 +113,9 @@ else:
             
             if st.button("Salesman Master", use_container_width=True):
                 st.session_state.page = "salesman_master"; st.rerun()
+
+            if st.button("Mapping Salesman", use_container_width=True):
+                st.session_state.page = "mapping_salesman"; st.rerun()
 
         st.markdown('<div class="sidebar-space"></div>', unsafe_allow_html=True)
 
@@ -196,7 +200,7 @@ else:
         from pages.area.mapping_branch import upload_mapping_branch_page
         upload_mapping_branch_page.app()
 
-     #  SALESMAN MASTER
+    #  SALESMAN MASTER
     elif st.session_state.page == "salesman_master":
         from pages.salesman.salesman_master import salesman_master_page
         salesman_master_page.app()
@@ -204,3 +208,13 @@ else:
     elif st.session_state.page == "upload_salesman_master":
         from pages.salesman.salesman_master import upload_salesman_master_page
         upload_salesman_master_page.app()
+
+    #  MAPPING SALESMAN
+    elif st.session_state.page == "mapping_salesman":
+        from pages.salesman.mapping_salesman import mapping_salesman_page
+        mapping_salesman_page.app()
+
+    elif st.session_state.page == "upload_mapping_salesman":
+        from pages.salesman.mapping_salesman import upload_mapping_salesman_page
+        upload_mapping_salesman_page.app()
+
