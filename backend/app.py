@@ -11,6 +11,7 @@ from routes.area.crd_mapping_branch import mapping_branch_bp
 from routes.salesman.crud_salesman_master import salesman_master_bp
 from routes.list_routes import list_bp
 from routes.salesman.crud_mapping_salesman import mapping_salesman_bp
+from routes.customer.crud_customer_prc import customer_prc_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -26,6 +27,8 @@ app.register_blueprint(mapping_branch_bp)
 app.register_blueprint(salesman_master_bp)
 app.register_blueprint(list_bp)
 app.register_blueprint(mapping_salesman_bp)
+app.register_blueprint(customer_prc_bp)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -14,6 +14,8 @@ if "collapse_area" not in st.session_state:
     st.session_state.collapse_area = False
 if "collapse_salesman" not in st.session_state:
     st.session_state.collapse_salesman = False
+if "collapse_customer" not in st.session_state:
+    st.session_state.collapse_customer = False
 
 # SIDEBAR CSS FIX
 st.markdown("""
@@ -119,6 +121,15 @@ else:
 
         st.markdown('<div class="sidebar-space"></div>', unsafe_allow_html=True)
 
+        #   COLLAPSIBLE: CUSTOMER
+        if st.button("Customer", key="btn_customer", use_container_width=True):
+            st.session_state.collapse_customer = not st.session_state.collapse_customer
+
+        if st.session_state.collapse_customer:
+            st.write("")
+            if st.button("Customer PRC", use_container_width=True):
+                st.session_state.page = "customer_prc"; st.rerun()
+
         #  USER CARD
         st.markdown(f"""
         <div style="text-align: center; padding: 0.5rem 0;">
@@ -217,4 +228,13 @@ else:
     elif st.session_state.page == "upload_mapping_salesman":
         from pages.salesman.mapping_salesman import upload_mapping_salesman_page
         upload_mapping_salesman_page.app()
+
+    # CUSTOMER PRC
+    elif st.session_state.page == "customer_prc":
+        from pages.customer.customer_prc import customer_prc_page
+        customer_prc_page.app()
+
+    elif st.session_state.page == "upload_customer_prc":
+        from pages.customer.customer_prc import upload_customer_prc
+        upload_customer_prc.app()
 
