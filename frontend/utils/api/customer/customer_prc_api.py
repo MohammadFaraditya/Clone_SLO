@@ -62,3 +62,36 @@ def insert_customer_prc(df, token=None):
     except Exception as e:
         st.error(f"Gagal menghubungi server: {e}")
         return None
+    
+# UPDATE CUSTOMER PRC
+def update_customer_prc(token, custno, custname, custadd, city, typecustomer, gharga, updateby):
+    if token is None:
+        token = st.session_state.get("token", None)
+    headers = {"Authorization" : token, "Content-Type": "application/json"}
+    payload = {
+        "custname" : custname,
+        "custadd" : custadd,
+        "city" : city,
+        "typecustomer" : typecustomer,
+        "gharga" : gharga,
+        "updateby" : updateby
+    }
+
+    try: 
+        response = requests.put(f"{API_URL}/customer-prc/update/{custno}", json=payload, headers=headers)
+        return response
+    except Exception as e:
+        st.error(f"Gagal update Salesman {custno} : {e}")
+        return None
+    
+# DELETE CUSTOMER PRC
+def delete_customer_prc(token, custno):
+    if token is None:
+        token = st.session_state.get("token", None)
+    headers = {"Authorization":token, "Content-Type": "application/json"}
+    payload = {"ids": custno}
+    try:
+        return requests.delete(f"{API_URL}/customer-prc/delete", json=payload, headers=headers)
+    except Exception as e:
+        st.error(f"Gagal hapus salesman master: {e}")
+        return None

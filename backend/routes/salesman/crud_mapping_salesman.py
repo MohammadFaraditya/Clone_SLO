@@ -208,7 +208,7 @@ def update_entity_route(id_salesman):
     cursor.close()
     conn.close()
     release_db_connection(conn)
-    return jsonify({"message": f" Entity {id_salesman} berhasil diupdate"}), 200
+    return jsonify({"message": f" Mapping {id_salesman} berhasil diupdate"}), 200
 
 # DELETE MAPPING SALESMAN
 @mapping_salesman_bp.route('/delete', methods=['DELETE'])

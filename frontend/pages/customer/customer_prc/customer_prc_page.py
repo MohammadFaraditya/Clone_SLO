@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 from utils.api.customer.customer_prc_api import (
     get_region_entity_branch_mapping,
-    get_customer_prc
+    get_customer_prc,
+    update_customer_prc,
+    delete_customer_prc
 
 )
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
@@ -95,7 +97,7 @@ def render_grid(df):
         update_mode=GridUpdateMode.VALUE_CHANGED,
         enable_enterprise_modules=True,
         fit_columns_on_grid_load=False,
-        key=f"mapping_salesman_grid_{st.session_state.grid_version}"
+        key=f"customer_prc_grid_{st.session_state.grid_version}"
     )
 
     updated_df = pd.DataFrame(grid_response["data"])
@@ -193,7 +195,7 @@ def app():
             else:
                 kodebranch = selected_branch.split(" - ")[0]
                 st.session_state["last_kodebranch"] = kodebranch 
-                with st.spinner("Mengambil data salesman..."):
+                with st.spinner("Mengambil data customer prc..."):
                     data = fetch_customer_prc(token, kodebranch)
 
                 st.session_state["customer_prc_display"] = data
@@ -210,80 +212,86 @@ def app():
 
         st.markdown("---")
 
-        #  BUTTON SIMPAN PERUBAHAN
+        # BUTTON SIMPAN PERUBAHAN
 
-        # if st.button("💾 Simpan Perubahan"):
-        #     success = 0
+        if st.button("💾 Simpan Perubahan"):
+            success = 0
 
-        #     original_dict = {str(r["custno"]): r for r in st.session_state["customer_prc_display"]}
-        #     updateby = st.session_state.user['nama']
+            original_dict = {str(r["custno"]): r for r in st.session_state["customer_prc_display"]}
+            updateby = st.session_state.user['nama']
 
-        #     for _, row in updated_df.iterrows():
-        #         sid = str(row["custno"])
+            for _, row in updated_df.iterrows():
+                sid = str(row["custno"])
 
-        #         if sid not in original_dict:
-        #             continue
+                if sid not in original_dict:
+                    continue
 
-        #         original_row = original_dict[sid]
+                original_row = original_dict[sid]
 
-        #         # kolom yang boleh diedit
-        #         changed = (
-        #             row["id_salesman_dist"] != original_row.get("id_salesman_dist") or
-        #             row["nama_salesman_dist"] != original_row.get("nama_salesman_dist")
-        #         )
+                # kolom yang boleh diedit
+                changed = (
+                    row["custname"] != original_row.get("custname") or
+                    row["custadd"] != original_row.get("custadd") or
+                    row["city"] != original_row.get("city") or
+                    row["type"] != original_row.get("type") or
+                    row["gharga"] != original_row.get("gharga")
+                )
 
-        #         if not changed:
-        #             continue
+                if not changed:
+                    continue
 
-        #         res = update_mapping_salesman(
-        #             token,
-        #             sid,
-        #             row["id_salesman_dist"],
-        #             row["nama_salesman_dist"],
-        #             updateby
-        #         )
+                res = update_customer_prc(
+                    token,
+                    sid,
+                    row["custname"],
+                    row["custadd"],
+                    row["city"],
+                    row["type"],
+                    row["gharga"],
+                    updateby
+                )
 
-        #         if res and res.status_code == 200:
-        #             success += 1
-        #         else:
-        #             st.error(f"Gagal update mapping salesman {sid}")
+                if res and res.status_code == 200:
+                    success += 1
+                else:
+                    st.error(f"Gagal update Customer PRC {sid}")
 
-        #     if success > 0:
-        #         st.success(f"Berhasil update {success} data mapping salesman")
+            if success > 0:
+                st.success(f"Berhasil update {success} data customer PRC")
 
-        #         # REFRESH DATA seperti di salesman_master_page.py
-        #         kodebranch = st.session_state.get("last_kodebranch")
+                # REFRESH DATA seperti di salesman_master_page.py
+                kodebranch = st.session_state.get("last_kodebranch")
 
-        #         if kodebranch:
-        #             data = fetch_all_mapping_salesman(token, kodebranch)
-        #             st.session_state["customer_prc_display"] = data
+                if kodebranch:
+                    data = fetch_customer_prc(token, kodebranch)
+                    st.session_state["customer_prc_display"] = data
 
-        #         st.session_state.grid_version += 1
-        #         st.rerun()
-        #     else:
-        #         st.info("Tidak ada perubahan yang disimpan.")
+                st.session_state.grid_version += 1
+                st.rerun()
+            else:
+                st.info("Tidak ada perubahan yang disimpan.")
 
-        #DELETE BRANCH  
-        # if st.button("🗑️ Hapus Data Terpilih"):
-        #     if selected_rows.empty:
-        #         st.warning("⚠ Centang minimal satu baris")
-        #     else:
-        #         ids = selected_rows["id_salesman"].astype(str).tolist()
-        #         res = delete_mapping_salesman(token, ids)
+        # DELETE BRANCH  
+        if st.button("🗑️ Hapus Data Terpilih"):
+            if selected_rows.empty:
+                st.warning("⚠ Centang minimal satu baris")
+            else:
+                ids = selected_rows["custno"].astype(str).tolist()
+                res = delete_customer_prc(token, ids)
 
-        #         if res and res.status_code == 200:
-        #             st.success(f"{len(ids)} data berhasil dihapus")
+                if res and res.status_code == 200:
+                    st.success(f"{len(ids)} data berhasil dihapus")
 
-        #             # REFRESH DATA seperti di salesman_master_page.py
-        #             kodebranch = st.session_state.get("last_kodebranch")
-        #             if kodebranch:
-        #                 data = fetch_all_mapping_salesman(token, kodebranch)
-        #                 st.session_state["customer_prc_display"] = data
+                    # REFRESH DATA seperti di salesman_master_page.py
+                    kodebranch = st.session_state.get("last_kodebranch")
+                    if kodebranch:
+                        data = fetch_customer_prc(token, kodebranch)
+                        st.session_state["customer_prc_display"] = data
 
-        #             st.session_state.grid_version += 1
-        #             st.rerun()
-        #         else:
-        #             st.error("Gagal menghapus data")
+                    st.session_state.grid_version += 1
+                    st.rerun()
+                else:
+                    st.error("Gagal menghapus data")
 
 
 if __name__ == "__main__":
