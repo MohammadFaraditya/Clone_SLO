@@ -1,34 +1,37 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
+from io import BytesIO
+from streamlit import cache_data
+from st_aggrid import AgGrid, GridUpdateMode, DataReturnMode
 from utils.api.customer.customer_dist_api import (
     get_region_entity_mapping_branch,
     get_customer_dist,
     update_customer_dist,
     delete_customer_dist
 )
-from st_aggrid import AgGrid, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100
 
-# FETCH DATA PAGINATION
-def fetch_customer_dist(token, branch_dist=None):
+# -------------------------
+# CACHE: ambil seluruh data branch
+# -------------------------
+@cache_data(ttl=600)
+def fetch_all_customer_dist_cached(token, branch_dist=None, chunk_limit=2000):
     all_data = []
     offset = 0
-    limit = PAGE_CHUNK
+    limit = chunk_limit
 
     while True:
-        res = get_customer_dist(
-            token, offset=offset, limit=limit, branch_dist=branch_dist
-        )
-
+        res = get_customer_dist(token, offset=offset, limit=limit, branch_dist=branch_dist)
         if not res or res.status_code != 200:
             break
 
         payload = res.json()
         chunk = payload.get("data", [])
-        all_data.extend(chunk)
-
         total = payload.get("total", 0)
+
+        all_data.extend(chunk)
         offset += len(chunk)
 
         if not chunk or offset >= total:
@@ -36,10 +39,18 @@ def fetch_customer_dist(token, branch_dist=None):
 
     return all_data
 
+@cache_data(ttl=3600)
+def get_mapping_cached(token):
+    res = get_region_entity_mapping_branch(token)
+    if res and res.status_code == 200:
+        return res.json().get("data", [])
+    return []
 
-# RENDER GRID
-def render_grid(df):
-    df = df.copy()
+# -------------------------
+# RENDER AG-GRID
+# -------------------------
+def render_grid(df, grid_key):
+    df_local = df.copy()
     ordered_columns = [
         "branch_dist",
         "custno_dist",
@@ -50,17 +61,16 @@ def render_grid(df):
         "updateby"
     ]
 
-    # pastikan semua kolom yang di-order ada di df, bila tidak ada buat kolom kosong agar indexing tidak error
     for col in ordered_columns:
-        if col not in df.columns:
-            df[col] = ""
+        if col not in df_local.columns:
+            df_local[col] = ""
 
-    df = df[ordered_columns]
+    df_local = df_local[ordered_columns]
 
     columnDefs = [
-        {"field": "branch_dist", "checkboxSelection": True, "headerCheckboxSelection": True},
-        {"field": "custno_dist"},
-        {"field": "custname","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
+        {"field": "branch_dist", "checkboxSelection": True, "headerCheckboxSelection": True, "pinned": "left"},
+        {"field": "custno_dist", "pinned": "left"},
+        {"field": "custname", "editable": True, "cellStyle": {"backgroundColor": "#E2EAF4"}},
         {"field": "createdate"},
         {"field": "createby"},
         {"field": "updatedate"},
@@ -69,18 +79,14 @@ def render_grid(df):
 
     grid_options = {
         "columnDefs": columnDefs,
-        "defaultColDef": {
-            "sortable": True,
-            "filter": True,
-            "resizable": True,
-        },
+        "defaultColDef": {"sortable": True, "filter": True, "resizable": True},
         "rowSelection": "multiple",
         "suppressMovableColumns": True,
         "animateRows": True
     }
 
     grid_response = AgGrid(
-        df,
+        df_local,
         gridOptions=grid_options,
         height=550,
         width="100%",
@@ -88,51 +94,50 @@ def render_grid(df):
         update_mode=GridUpdateMode.VALUE_CHANGED,
         enable_enterprise_modules=True,
         fit_columns_on_grid_load=False,
-        key=f"customer_dist_grid{st.session_state.grid_version}"
+        key=grid_key
     )
 
     updated_df = pd.DataFrame(grid_response["data"])
     selected_rows = pd.DataFrame(grid_response["selected_rows"])
-
     return updated_df, selected_rows
 
+# -------------------------
+# EXPORT EXCEL
+# -------------------------
+def to_excel_bytes(df: pd.DataFrame) -> bytes:
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    buffer.seek(0)
+    return buffer.read()
+
+# -------------------------
 # MAIN APP
+# -------------------------
 def app():
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠ Anda harus login terlebih dahulu.")
         st.session_state.page = "main"
         return
-    
-    if "grid_version" not in st.session_state:
-        st.session_state.grid_version = 1
+
+    token = st.session_state.token
+    updateby = st.session_state.user.get("nama", "SYSTEM")
+
+    st.session_state.setdefault("grid_version", 1)
+    st.session_state.setdefault("customer_dist_full", None)
+    st.session_state.setdefault("last_branch_dist", None)
+    st.session_state.setdefault("mapping_customer_dist", None)
+    st.session_state.setdefault("show_delete_confirm", False)
+    st.session_state.setdefault("delete_ids", [])
 
     st.title("🏪 Customer Dist")
-    token = st.session_state.token
-    updateby = st.session_state.user['nama']
 
-    if st.session_state.get("refresh_customer_dist"):
-        st.session_state.refresh_customer_dist = False 
+    # Load mapping
+    if st.session_state.get("mapping_customer_dist") is None:
+        with st.spinner("Memuat mapping region/entity/branch..."):
+            st.session_state["mapping_customer_dist"] = get_mapping_cached(token)
 
-        kodebranch = st.session_state.get("last_kodebranch")
-        if kodebranch:
-            with st.spinner("Memuat ulang data setelah upload..."):
-                data = fetch_customer_dist(token, kodebranch)
-
-            st.session_state["customer_dist_display"] = data
-            st.session_state.grid_version += 1
-            st.success(f"Data berhasil diperbarui (Branch: {kodebranch})")
-
-    # LOAD MAPPING REGION/ENTITY/BRANCH
-    if "customer_dist" not in st.session_state:
-        with st.spinner("Memuat data region/entity/branch..."):
-            res = get_region_entity_mapping_branch(token)
-            if res and res.status_code == 200:
-                st.session_state.customer_dist = res.json().get("data", [])
-            else:
-                st.error("Gagal memuat mapping region/entity/branch")
-                return
-
-    mapping_df = pd.DataFrame(st.session_state.customer_dist)
+    mapping_df = pd.DataFrame(st.session_state.get("mapping_customer_dist", []))
 
     if "filter_expander_open" not in st.session_state:
         st.session_state.filter_expander_open = True
@@ -143,25 +148,17 @@ def app():
         st.rerun()
         return
 
-    # POPUP FILTER REGION → ENTITY → BRANCH
+    # FILTER
     with st.expander("🔍 Filter Data", expanded=st.session_state.filter_expander_open):
-
-        mapping_df["region_display"] = (
-            mapping_df["koderegion"].fillna('') + " - " + mapping_df["region_name"].fillna('')
-        )
+        mapping_df["region_display"] = mapping_df["koderegion"].fillna("") + " - " + mapping_df["region_name"].fillna("")
         region_list = sorted(mapping_df["region_display"].dropna().unique().tolist())
         selected_region = st.selectbox("Pilih Region:", ["(Pilih Region)"] + region_list)
 
         entity_list = []
         if selected_region != "(Pilih Region)":
             koderegion = selected_region.split(" - ")[0]
-
-            # FIX: kasih .copy()
             entity_df = mapping_df[mapping_df["koderegion"] == koderegion].copy()
-
-            entity_df["entity_display"] = (
-                entity_df["id_entity"].fillna('') + " - " + entity_df["entity_name"].fillna('')
-            )
+            entity_df["entity_display"] = entity_df["id_entity"].fillna("") + " - " + entity_df["entity_name"].fillna("")
             entity_list = sorted(entity_df["entity_display"].dropna().unique().tolist())
 
         selected_entity = st.selectbox("Pilih Entity:", ["(Pilih Entity)"] + entity_list)
@@ -169,13 +166,8 @@ def app():
         branch_list = []
         if selected_entity != "(Pilih Entity)":
             id_entity = selected_entity.split(" - ")[0]
-
-            # FIX: kasih .copy()
             branch_df = mapping_df[mapping_df["id_entity"] == id_entity].copy()
-
-            branch_df["branch_dist_display"] = (
-                branch_df["branch_dist"].fillna('') + " - " + branch_df["nama_branch_dist"].fillna('')
-            )
+            branch_df["branch_dist_display"] = branch_df["branch_dist"].fillna("") + " - " + branch_df["nama_branch_dist"].fillna("")
             branch_list = sorted(branch_df["branch_dist_display"].dropna().unique().tolist())
 
         selected_branch = st.selectbox("Pilih Branch:", ["(Pilih Branch)"] + branch_list)
@@ -184,98 +176,139 @@ def app():
             if selected_branch == "(Pilih Branch)":
                 st.warning("⚠ Pilih branch dahulu")
             else:
-                kodebranch = selected_branch.split(" - ")[0]
-                st.session_state["last_kodebranch"] = kodebranch 
+                branch_dist = selected_branch.split(" - ")[0]
+                st.session_state["last_branch_dist"] = branch_dist
                 with st.spinner("Mengambil data customer dist..."):
-                    data = fetch_customer_dist(token, kodebranch)
+                    all_rows = fetch_all_customer_dist_cached(token, branch_dist)
+                st.session_state["customer_dist_full"] = all_rows
+                st.session_state["grid_version"] += 1
+                st.success(f"Berhasil memuat {len(all_rows)} data!")
 
-                st.session_state["customer_dist_display"] = data
-                st.success(f"Berhasil memuat {len(data)} data!")
+    # MANUAL RELOAD / CLEAR
+    cols = st.columns([1, 6, 1])
+    with cols[0]:
+        if st.button("🔄 Force Reload"):
+            fetch_all_customer_dist_cached.clear()
+            get_mapping_cached.clear()
+            branch_dist = st.session_state.get("last_branch_dist")
+            if branch_dist:
+                with st.spinner("Memuat ulang data (fresh)..."):
+                    all_rows = fetch_all_customer_dist_cached(token, branch_dist)
+                st.session_state["customer_dist_full"] = all_rows
+                st.session_state["grid_version"] += 1
+                st.success(f"Reload selesai, {len(all_rows)} rows.")
 
+    with cols[2]:
+        if st.button("🔁 Clear Local Data"):
+            st.session_state["customer_dist_full"] = None
+            st.session_state["last_branch_dist"] = None
+            st.session_state["grid_version"] += 1
+            st.info("Data lokal dihapus. Terapkan filter lagi untuk memuat data.")
 
     # DISPLAY GRID
-    if "customer_dist_display" in st.session_state and st.session_state["customer_dist_display"]:
-
-        df = pd.DataFrame(st.session_state["customer_dist_display"])
+    if st.session_state.get("customer_dist_full"):
+        full_data = st.session_state["customer_dist_full"]
+        df = pd.DataFrame(full_data)
         df.insert(0, "No", range(1, len(df) + 1))
 
-        updated_df, selected_rows = render_grid(df)
+        updated_df, selected_rows = render_grid(df, grid_key=f"customer_dist_grid_{st.session_state.grid_version}")
 
         st.markdown("---")
         st.info(f"Total Data : **{len(df)}**")
-        # BUTTON SIMPAN PERUBAHAN
 
+        # SAVE CHANGES
         if st.button("💾 Simpan Perubahan"):
-            success = 0
-
-            original_dict = {str(r["custno_dist"]): r for r in st.session_state["customer_dist_display"]}
-            updateby = st.session_state.user['nama']
+            changed_rows = []
+            original_map = {str(r["custno_dist"]): r for r in full_data}
 
             for _, row in updated_df.iterrows():
                 sid = str(row["custno_dist"])
-
-                if sid not in original_dict:
+                if sid not in original_map:
                     continue
+                orig = original_map[sid]
 
-                original_row = original_dict[sid]
+                if (row["custname"] != orig.get("custname")):
+                    changed_rows.append({
+                        "custno_dist": sid,
+                        "custname": row["custname"] or "",
+                        "updateby": updateby
+                    })
 
-                # kolom yang boleh diedit
-                changed = (
-                    row["custname"] != original_row.get("custname")
-                )
-
-                if not changed:
-                    continue
-
-                res = update_customer_dist(
-                    token,
-                    sid,
-                    row["custname"],
-                    updateby
-                )
-
-                if res and res.status_code == 200:
-                    success += 1
-                else:
-                    st.error(f"Gagal update Customer DIST {sid}")
-
-            if success > 0:
-                st.success(f"Berhasil update {success} data customer DIST")
-
-                # REFRESH DATA seperti di salesman_master_page.py
-                kodebranch = st.session_state.get("last_kodebranch")
-
-                if kodebranch:
-                    data = fetch_customer_dist(token, kodebranch)
-                    st.session_state["customer_dist_display"] = data
-
-                st.session_state.grid_version += 1
-                st.rerun()
-            else:
+            if not changed_rows:
                 st.info("Tidak ada perubahan yang disimpan.")
+            else:
+                success = 0
+                fail_list = []
+                with st.spinner(f"Menyimpan {len(changed_rows)} perubahan..."):
+                    for r in changed_rows:
+                        res = update_customer_dist(token, r["custno_dist"], r["custname"], r["updateby"])
+                        if res and res.status_code == 200:
+                            success += 1
+                            # update lokal
+                            for local_r in st.session_state["customer_dist_full"]:
+                                if str(local_r.get("custno_dist")) == r["custno_dist"]:
+                                    local_r["custname"] = r["custname"]
+                                    local_r["updatedate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    local_r["updateby"] = updateby
+                                    break
+                        else:
+                            fail_list.append(r["custno_dist"])
 
-        # DELETE BRANCH  
+                if success > 0:
+                    st.success(f"{success} perubahan berhasil disimpan.")
+                    st.session_state["grid_version"] += 1
+                if fail_list:
+                    st.error(f"Gagal menyimpan untuk custno_dist: {', '.join(fail_list)}")
+
+        # DELETE SELECTED
         if st.button("🗑️ Hapus Data Terpilih"):
             if selected_rows.empty:
                 st.warning("⚠ Centang minimal satu baris")
             else:
-                ids = selected_rows["custno_dist"].astype(str).tolist()
-                res = delete_customer_dist(token, ids)
+                st.session_state["delete_ids"] = selected_rows["custno_dist"].astype(str).tolist()
+                st.session_state["show_delete_confirm"] = True
 
-                if res and res.status_code == 200:
-                    st.success(f"{len(ids)} data berhasil dihapus")
+        if st.session_state.get("show_delete_confirm", False):
+            st.warning(f"Yakin ingin menghapus {len(st.session_state['delete_ids'])} data?")
 
-                    # REFRESH DATA seperti di salesman_master_page.py
-                    kodebranch = st.session_state.get("last_kodebranch")
-                    if kodebranch:
-                        data = fetch_customer_dist(token, kodebranch)
-                        st.session_state["customer_dist_display"] = data
+            c1, c2 = st.columns([1,1])
+            with c1:
+                if st.button("Ya, Hapus", key="confirm_delete_yes"):
+                    ids = st.session_state["delete_ids"]
+                    res = delete_customer_dist(token, ids)
+                    if res and res.status_code == 200:
+                        st.session_state["customer_dist_full"] = [
+                            r for r in st.session_state["customer_dist_full"]
+                            if str(r.get("custno_dist")) not in set(ids)
+                        ]
+                        st.success(f"{len(ids)} data berhasil dihapus.")
+                        st.session_state["grid_version"] += 1
+                    else:
+                        st.error("Gagal menghapus data di server.")
+                    st.session_state["show_delete_confirm"] = False
+                    st.session_state["delete_ids"] = []
 
-                    st.session_state.grid_version += 1
-                    st.rerun()
-                else:
-                    st.error("Gagal menghapus data")
+            with c2:
+                if st.button("Batal", key="confirm_delete_no"):
+                    st.session_state["show_delete_confirm"] = False
+                    st.session_state["delete_ids"] = []
+                    st.info("Penghapusan dibatalkan.")
 
+        # EXPORT EXCEL
+        if st.button("📥 Export Current View to Excel"):
+            export_df = updated_df.copy()
+            if "No" in export_df.columns:
+                export_df = export_df.drop(columns=["No"])
+            excel_bytes = to_excel_bytes(export_df)
+            st.download_button(
+                label="Download .xlsx",
+                data=excel_bytes,
+                file_name=f"customer_dist_{st.session_state.get('last_branch_dist','all')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    else:
+        st.info("Silakan terapkan filter branch untuk memuat data full.")
 
 if __name__ == "__main__":
     app()

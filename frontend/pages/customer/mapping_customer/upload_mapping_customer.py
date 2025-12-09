@@ -4,7 +4,6 @@ from io import BytesIO
 from datetime import datetime
 from utils.api.customer.mapping_customer_api import insert_mapping_customer
 
-
 # ============================
 # GENERATE TEMPLATE XLSX
 # ============================
@@ -16,30 +15,20 @@ def generate_template():
     buffer.seek(0)
     return buffer
 
-
 # ============================
-# NORMALISASI VALUE (FIX PYARROW)
+# NORMALISASI VALUE
 # ============================
 def normalize_value(val):
-    """
-    Mengubah:
-    - list → 'a, b, c'
-    - None → ''
-    - angka → string
-    - lainnya → string
-    """
     if isinstance(val, list):
         return ", ".join([str(v) for v in val])
     if val is None:
         return ""
     return str(val)
 
-
 # ============================
 # PROSES UPLOAD
 # ============================
 def process_upload(file, username):
-
     try:
         df = pd.read_excel(file, dtype=str)
     except Exception:
@@ -51,7 +40,6 @@ def process_upload(file, username):
         st.error("Kolom harus sesuai template")
         return None
 
-    # Bersihkan nilai
     for col in required_cols:
         df[col] = df[col].apply(normalize_value)
 
@@ -68,18 +56,14 @@ def process_upload(file, username):
             return res.json()
         except Exception:
             return {"message": f"Berhasil upload {len(df)} record ke database."}
-
     else:
         st.error(f"Gagal upload data: {res.text}")
         return None
-
-
 
 # ============================
 # MAIN PAGE
 # ============================
 def app():
-
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠️ Anda harus login terlebih dahulu.")
         st.session_state.page = "main"
@@ -108,14 +92,12 @@ def app():
     # UPLOAD
     # ============================
     if not st.session_state.upload_done:
-
         st.subheader("📤 Upload Data Mapping Customer")
         uploaded_file = st.file_uploader("Pilih file", type=["xlsx"])
 
         if uploaded_file and st.button("🚀 Upload Data"):
             with st.spinner("Sedang memproses data..."):
                 result_json = process_upload(uploaded_file, username)
-
             if result_json:
                 st.session_state.upload_result = result_json
                 st.session_state.upload_done = True
@@ -126,7 +108,6 @@ def app():
     # ============================
     else:
         result_json = st.session_state.upload_result
-
         message = result_json.get("message", "")
         duplicate_entities = result_json.get("skipped_duplicate", [])
         skipped_invalid_prc = result_json.get("skipped_invalid_prc", [])
@@ -139,50 +120,31 @@ def app():
 
         # Build tabel skip
         rows = []
-
         for i in duplicate_entities:
-            rows.append({
-                "custno": normalize_value(i),
-                "custno_dist": "",
-                "Status": "Duplicated (Skipped)"
-            })
-
+            rows.append({"custno": normalize_value(i), "custno_dist": "", "Status": "Duplicated (Skipped)"})
         for r in skipped_invalid_prc:
-            rows.append({
-                "custno": normalize_value(r),
-                "custno_dist": "",
-                "Status": "Customer PRC belum terdaftar (Skipped)"
-            })
-
+            rows.append({"custno": normalize_value(r), "custno_dist": "", "Status": "Customer PRC belum terdaftar (Skipped)"})
         for t in skipped_invalid_dist:
-            rows.append({
-                "custno": "",
-                "custno_dist": normalize_value(t),
-                "Status": "Customer DIST belum terdaftar (Skipped)"
-            })
+            rows.append({"custno": "", "custno_dist": normalize_value(t), "Status": "Customer DIST belum terdaftar (Skipped)"})
 
         if rows:
             df_display = pd.DataFrame(rows)
-
             st.warning("⚠️ Sebagian data tidak diproses. Lihat tabel di bawah.")
-            st.dataframe(
-                df_display,
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(df_display, width="100%", hide_index=True)
         else:
             st.success("🔥 Semua data berhasil ditambahkan tanpa error.")
 
         st.markdown("---")
 
+        # ============================
+        # KEMBALI KE HALAMAN MAPPING CUSTOMER
+        # ============================
         if st.button("⬅️ Kembali ke Data Mapping Customer"):
-            st.cache_data.clear()
             st.session_state.refresh_mapping_customer = True
             st.session_state.page = "mapping_customer"
             st.session_state.upload_done = False
             st.session_state.upload_result = None
             st.rerun()
-
 
 
 if __name__ == "__main__":
