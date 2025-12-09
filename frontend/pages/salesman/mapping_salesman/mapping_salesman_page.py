@@ -129,16 +129,16 @@ def app():
             st.success(f"Data berhasil diperbarui (Branch: {kodebranch})")
 
     # LOAD MAPPING REGION/ENTITY/BRANCH
-    if "mapping" not in st.session_state:
+    if "mapping_salesman" not in st.session_state:
         with st.spinner("Memuat data region/entity/branch..."):
             res = get_region_entity_branch_mapping(token)
             if res and res.status_code == 200:
-                st.session_state.mapping = res.json().get("data", [])
+                st.session_state.mapping_salesman = res.json().get("data", [])
             else:
                 st.error("Gagal memuat mapping region/entity/branch")
                 return
 
-    mapping_df = pd.DataFrame(st.session_state.mapping)
+    mapping_df = pd.DataFrame(st.session_state.mapping_salesman)
 
     if "filter_expander_open" not in st.session_state:
         st.session_state.filter_expander_open = True
@@ -208,6 +208,8 @@ def app():
         updated_df, selected_rows = render_grid(df)
 
         st.markdown("---")
+
+        st.info(f"Total Data : **{len(df)}**")
 
         #  BUTTON SIMPAN PERUBAHAN
 

@@ -36,6 +36,8 @@ st.markdown("""
     .sidebar-space {
         height: 6px;
     }
+            
+}
 
 </style>
 """, unsafe_allow_html=True)
@@ -70,78 +72,116 @@ else:
     #   SIDEBAR
     with st.sidebar:
 
-        # --- Dashboard ---
-        if st.button("🏠 Dashboard Utama", use_container_width=True):
-            st.session_state.page = "main"
-            st.session_state.submenu = None
-            st.rerun()
+        # SIDEBAR STYLE
+            st.markdown("""
+            <style>
+            .sidebar-section {
+                background-color: #f0f2f6;
+                padding: 6px 10px;
+                border-radius: 8px;
+                margin-bottom: 8px;
+            }
+            .menu-title {
+                font-weight: bold;
+                font-size: 18px;
+                margin-bottom: 10px;
+            }
+            .menu-item {
+                padding: 6px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                display: block;
+            }
+            .menu-item:hover {
+                background-color: #e3e7ee;
+            }
+            .submenu-item {
+                padding: 5px 25px;
+                cursor: pointer;
+                font-size: 14px;
+                display: block;
+                color: #333333;
+            }
+            .submenu-item:hover {
+                background-color: #e3e7ee;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
-        st.markdown('<div class="sidebar-space"></div>', unsafe_allow_html=True)
+            st.markdown("<div class='menu-title'>📁 Menu</div>", unsafe_allow_html=True)
 
-        #     COLLAPSIBLE: AREA
-        if st.button("Area", key="btn_area", use_container_width=True):
-            st.session_state.collapse_area = not st.session_state.collapse_area
+            # Dashboard
+            if st.button("🏠 Dashboard Utama", use_container_width=True):
+                st.session_state.page = "main"
+                st.rerun()
 
-        if st.session_state.collapse_area:
-            st.write("")
-            if st.button("Area SPV", use_container_width=True):
-                st.session_state.page = "area"; st.rerun()
+            st.markdown("---")
 
-            if st.button("Region", use_container_width=True):
-                st.session_state.page = "region"; st.rerun()
+            # AREA MENU
+            if st.button("▶️ Area", key="area_menu", use_container_width=True):
+                st.session_state.collapse_area = not st.session_state.collapse_area
 
-            if st.button("Entity", use_container_width=True):
-                st.session_state.page = "entity"; st.rerun()
+            if st.session_state.get("collapse_area", False):
+                if st.button("Area SPV", key="area1", use_container_width=True):
+                    st.session_state.page = "area"; st.rerun()
+                if st.button("Region", key="area2", use_container_width=True):
+                    st.session_state.page = "region"; st.rerun()
+                if st.button("Entity", key="area3", use_container_width=True):
+                    st.session_state.page = "entity"; st.rerun()
+                if st.button("Branch", key="area4", use_container_width=True):
+                    st.session_state.page = "branch"; st.rerun()
+                if st.button("Branch Dist", key="area5", use_container_width=True):
+                    st.session_state.page = "branch_dist"; st.rerun()
+                if st.button("Mapping Branch", key="area6", use_container_width=True):
+                    st.session_state.page = "mapping_branch"; st.rerun()
 
-            if st.button("Branch", use_container_width=True):
-                st.session_state.page = "branch"; st.rerun()
+            st.markdown("---")
 
-            if st.button("Branch Dist", use_container_width=True):
-                st.session_state.page = "branch_dist"; st.rerun()
+            # SALESMAN MENU
+            if st.button("▶️ Salesman", key="salesman_menu", use_container_width=True):
+                st.session_state.collapse_salesman = not st.session_state.collapse_salesman
 
-            if st.button("Mapping Branch", use_container_width=True):
-                st.session_state.page = "mapping_branch"; st.rerun()
+            if st.session_state.get("collapse_salesman", False):
+                if st.button("Salesman Team", key="sales1", use_container_width=True):
+                    st.session_state.page = "salesman_team"; st.rerun()
 
-        st.markdown('<div class="sidebar-space"></div>', unsafe_allow_html=True)
+                if st.button("Salesman Master", key="sales2", use_container_width=True):
+                    st.session_state.page = "salesman_master"; st.rerun()
 
-        #   COLLAPSIBLE: SALESMAN
-        if st.button("Salesman", key="btn_salesman", use_container_width=True):
-            st.session_state.collapse_salesman = not st.session_state.collapse_salesman
+                if st.button("Mapping Salesman", key="sales3", use_container_width=True):
+                    st.session_state.page = "mapping_salesman"; st.rerun()
 
-        if st.session_state.collapse_salesman:
-            st.write("")
-            if st.button("Salesman Team", use_container_width=True):
-                st.session_state.page = "salesman_team"; st.rerun()
-            
-            if st.button("Salesman Master", use_container_width=True):
-                st.session_state.page = "salesman_master"; st.rerun()
+            st.markdown("---")
 
-            if st.button("Mapping Salesman", use_container_width=True):
-                st.session_state.page = "mapping_salesman"; st.rerun()
+            # CUSTOMER MENU
+            if st.button("▶️ Customer", key="customer_menu", use_container_width=True):
+                st.session_state.collapse_customer = not st.session_state.collapse_customer
 
-        st.markdown('<div class="sidebar-space"></div>', unsafe_allow_html=True)
+            if st.session_state.get("collapse_customer", False):
+                if st.button("Customer PRC", key="cust1", use_container_width=True):
+                    st.session_state.page = "customer_prc"; st.rerun()
 
-        #   COLLAPSIBLE: CUSTOMER
-        if st.button("Customer", key="btn_customer", use_container_width=True):
-            st.session_state.collapse_customer = not st.session_state.collapse_customer
+                if st.button("Customer DIST", key="cust2", use_container_width=True):
+                    st.session_state.page = "customer_dist"; st.rerun()
 
-        if st.session_state.collapse_customer:
-            st.write("")
-            if st.button("Customer PRC", use_container_width=True):
-                st.session_state.page = "customer_prc"; st.rerun()
+                if st.button("Mapping Customer", key="cust3", use_container_width=True):
+                    st.session_state.page = "mapping_customer"; st.rerun()
 
-        #  USER CARD
-        st.markdown(f"""
-        <div style="text-align: center; padding: 0.5rem 0;">
-            <div style="font-size: 40px; color: #6c63ff;">👤</div>
-            <div style="font-size: 16px; font-weight: bold;">{user['nama']}</div>
-            <div style="color: gray; font-size: 14px;">{user['jabatan']}</div>
-        </div>
-        """, unsafe_allow_html=True)
+            st.markdown("---")
 
-        if st.button("Logout", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
+            # USER CARD + LOGOUT
+            st.markdown(f"""
+                <div style="text-align: center; padding: 0.5rem 0;">
+                    <div style="font-size: 40px; color: #6c63ff;">👤</div>
+                    <div style="font-size: 16px; font-weight: bold;">{user['nama']}</div>
+                    <div style="color: gray; font-size: 14px;">{user['jabatan']}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            if st.button("Logout", use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
+
 
     #  PAGE ROUTER
     if st.session_state.page == "main":
@@ -237,4 +277,22 @@ else:
     elif st.session_state.page == "upload_customer_prc":
         from pages.customer.customer_prc import upload_customer_prc
         upload_customer_prc.app()
+
+    # CUSTOMER DIST
+    elif st.session_state.page == "customer_dist":
+        from pages.customer.customer_dist import customer_dist_page
+        customer_dist_page.app()
+
+    elif st.session_state.page == "upload_customer_dist":
+        from pages.customer.customer_dist import upload_customer_dist
+        upload_customer_dist.app()
+    
+    # MAPPING CUSTOMER
+    elif st.session_state.page == "mapping_customer":
+        from pages.customer.mapping_customer import mapping_customer_page
+        mapping_customer_page.app()
+
+    elif st.session_state.page == "upload_mapping_customer":
+        from pages.customer.mapping_customer import upload_mapping_customer
+        upload_mapping_customer.app()
 

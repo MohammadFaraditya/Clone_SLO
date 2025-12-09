@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-from utils.api.customer.customer_prc_api import insert_customer_prc
+from utils.api.customer.customer_dist_api import insert_customer_dist
 
 def generate_template():
-    df = pd.DataFrame(columns=["custno", "custname", "custadd","city", "type", "gharga", "kodebranch"])
+    df = pd.DataFrame(columns=["custno_dist", "custname", "branch_dist"])
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template")
@@ -15,13 +15,13 @@ def generate_template():
 # UPLOAD
 def process_upload(file, username):
     try:
-        df = pd.read_excel(file)
+        df = pd.read_excel(file, dtype={"custno_dist": str, "branch_dist": str})
     except Exception:
         st.error("❌ File tidak valid. Pastikan file Excel benar.")
         return None
     
     # VALIDASI KOLOM
-    required_cols = ["custno", "custname", "custadd","city", "type", "gharga", "kodebranch"]
+    required_cols = ["custno_dist", "custname", "branch_dist"]
     if not all(col in df.columns for col in required_cols):
         st.error("Kolom harus sesuai template")
         return None
@@ -31,7 +31,7 @@ def process_upload(file, username):
     df["createdate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # KIRIM DATA KE API
-    res = insert_customer_prc(df)
+    res = insert_customer_dist(df)
     if not res:
         st.error("Gagal terhubung ke server")
         return None
@@ -64,21 +64,21 @@ def app():
 
     username = st.session_state.user["nama"]
 
-    st.title("⬆️ Upload Customer PRC")
+    st.title("⬆️ Upload Customer Dist")
 
     # DOWNLOAD TEMPLATE
-    st.subheader("📄 Download Template Customer PRC")
+    st.subheader("📄 Download Template Customer Dist")
     template_file = generate_template()
     st.download_button(
         label="Download Template",
         data=template_file,
-        file_name="template_customer_prc.xlsx",
+        file_name="template_customer_dist.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
     # BELUM UPLOAD
     if not st.session_state.upload_done:
-        st.subheader("📤 Upload Data Customer PRC")
+        st.subheader("📤 Upload Data Customer DIST")
         uploaded_file = st.file_uploader("Pilih file", type=["xlsx"])
 
         if uploaded_file and st.button("🚀 Upload Data"):
@@ -107,24 +107,24 @@ def app():
         # DUPLIKAT INTERNAL EXCEL
         for sid in duplicate_internal:
             rows.append({
-                "custno": sid,
-                "kode_branch": "",
+                "custno_dist": sid,
+                "branch_dist": "",
                 "Status": "Duplikat internal pada file Excel (Skipped)"
             })
 
         # DUPLIKAT DI DATABASE
         for sid in duplicate_ids:
             rows.append({
-                "custno": sid,
-                "kode_branch": "",
+                "custno_dist": sid,
+                "branch_dist": "",
                 "Status": "Duplikat di database (Skipped)"
             })
 
-        # INVALID KODEBRANCH
+        # INVALID BRANCH DIST
         for sid in invalid_kodebranch:
             rows.append({
-                "custno": sid,
-                "kode_branch": "",
+                "custno_dist": sid,
+                "branch_dist": "",
                 "Status": "Invalid Custno (Skipped)"
             })
 
@@ -139,10 +139,10 @@ def app():
 
         # BUTTON BACK
         st.markdown("---")
-        if st.button("⬅️ Kembali ke Data Customer PRC"):
+        if st.button("⬅️ Kembali ke Data Customer DIST"):
             st.cache_data.clear()
-            st.session_state["refresh_customer_prc"] = True
-            st.session_state.page = "customer_prc"
+            st.session_state["refresh_customer_dist"] = True
+            st.session_state.page = "customer_dist"
             st.session_state.upload_done = False
             st.session_state.upload_result = None
             st.rerun()

@@ -11,7 +11,7 @@ def get_region_entity_branch_mapping(token=None):
     headers = {"Authorization": token}
 
     try:
-        return requests.get(f"{API_URL}/list/mapping", headers=headers, timeout=30)
+        return requests.get(f"{API_URL}/list/area", headers=headers, timeout=30)
     except Exception as e:
         st.error(f"Gagal mengambil mapping region-entity-branch: {e}")
         return None

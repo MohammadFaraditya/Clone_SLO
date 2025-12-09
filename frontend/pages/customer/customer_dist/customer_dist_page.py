@@ -1,25 +1,24 @@
 import streamlit as st
 import pandas as pd
-from utils.api.customer.customer_prc_api import (
-    get_region_entity_branch_mapping,
-    get_customer_prc,
-    update_customer_prc,
-    delete_customer_prc
-
+from utils.api.customer.customer_dist_api import (
+    get_region_entity_mapping_branch,
+    get_customer_dist,
+    update_customer_dist,
+    delete_customer_dist
 )
 from st_aggrid import AgGrid, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100
 
 # FETCH DATA PAGINATION
-def fetch_customer_prc(token, kodebranch=None):
+def fetch_customer_dist(token, branch_dist=None):
     all_data = []
     offset = 0
     limit = PAGE_CHUNK
 
     while True:
-        res = get_customer_prc(
-            token, offset=offset, limit=limit, kodebranch=kodebranch
+        res = get_customer_dist(
+            token, offset=offset, limit=limit, branch_dist=branch_dist
         )
 
         if not res or res.status_code != 200:
@@ -42,13 +41,9 @@ def fetch_customer_prc(token, kodebranch=None):
 def render_grid(df):
     df = df.copy()
     ordered_columns = [
-        "kodebranch",
-        "custno",
+        "branch_dist",
+        "custno_dist",
         "custname",
-        "custadd",
-        "city",
-        "type",
-        "gharga",
         "createdate",
         "createby",
         "updatedate",
@@ -63,13 +58,9 @@ def render_grid(df):
     df = df[ordered_columns]
 
     columnDefs = [
-        {"field": "kodebranch", "checkboxSelection": True, "headerCheckboxSelection": True},
-        {"field": "custno"},
+        {"field": "branch_dist", "checkboxSelection": True, "headerCheckboxSelection": True},
+        {"field": "custno_dist"},
         {"field": "custname","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "custadd","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "city","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "type","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "gharga","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
         {"field": "createdate"},
         {"field": "createby"},
         {"field": "updatedate"},
@@ -97,7 +88,7 @@ def render_grid(df):
         update_mode=GridUpdateMode.VALUE_CHANGED,
         enable_enterprise_modules=True,
         fit_columns_on_grid_load=False,
-        key=f"customer_prc_grid_{st.session_state.grid_version}"
+        key=f"customer_dist_grid{st.session_state.grid_version}"
     )
 
     updated_df = pd.DataFrame(grid_response["data"])
@@ -115,40 +106,40 @@ def app():
     if "grid_version" not in st.session_state:
         st.session_state.grid_version = 1
 
-    st.title("🏪 Customer Master")
+    st.title("🏪 Customer Dist")
     token = st.session_state.token
     updateby = st.session_state.user['nama']
 
-    if st.session_state.get("refresh_customer_prc"):
-        st.session_state.refresh_customer_prc = False 
+    if st.session_state.get("refresh_customer_dist"):
+        st.session_state.refresh_customer_dist = False 
 
         kodebranch = st.session_state.get("last_kodebranch")
         if kodebranch:
             with st.spinner("Memuat ulang data setelah upload..."):
-                data = fetch_customer_prc(token, kodebranch)
+                data = fetch_customer_dist(token, kodebranch)
 
-            st.session_state["customer_prc_display"] = data
+            st.session_state["customer_dist_display"] = data
             st.session_state.grid_version += 1
             st.success(f"Data berhasil diperbarui (Branch: {kodebranch})")
 
     # LOAD MAPPING REGION/ENTITY/BRANCH
-    if "customer_prc" not in st.session_state:
+    if "customer_dist" not in st.session_state:
         with st.spinner("Memuat data region/entity/branch..."):
-            res = get_region_entity_branch_mapping(token)
+            res = get_region_entity_mapping_branch(token)
             if res and res.status_code == 200:
-                st.session_state.customer_prc = res.json().get("data", [])
+                st.session_state.customer_dist = res.json().get("data", [])
             else:
                 st.error("Gagal memuat mapping region/entity/branch")
                 return
 
-    mapping_df = pd.DataFrame(st.session_state.customer_prc)
+    mapping_df = pd.DataFrame(st.session_state.customer_dist)
 
     if "filter_expander_open" not in st.session_state:
         st.session_state.filter_expander_open = True
 
     # BUTTON UPLOAD
-    if st.button("⬆️ Upload Customer PRC"):
-        st.session_state.page = "upload_customer_prc"
+    if st.button("⬆️ Upload Customer Dist"):
+        st.session_state.page = "upload_customer_dist"
         st.rerun()
         return
 
@@ -182,10 +173,10 @@ def app():
             # FIX: kasih .copy()
             branch_df = mapping_df[mapping_df["id_entity"] == id_entity].copy()
 
-            branch_df["branch_display"] = (
-                branch_df["kodebranch"].fillna('') + " - " + branch_df["nama_branch"].fillna('')
+            branch_df["branch_dist_display"] = (
+                branch_df["branch_dist"].fillna('') + " - " + branch_df["nama_branch_dist"].fillna('')
             )
-            branch_list = sorted(branch_df["branch_display"].dropna().unique().tolist())
+            branch_list = sorted(branch_df["branch_dist_display"].dropna().unique().tolist())
 
         selected_branch = st.selectbox("Pilih Branch:", ["(Pilih Branch)"] + branch_list)
 
@@ -195,34 +186,33 @@ def app():
             else:
                 kodebranch = selected_branch.split(" - ")[0]
                 st.session_state["last_kodebranch"] = kodebranch 
-                with st.spinner("Mengambil data customer prc..."):
-                    data = fetch_customer_prc(token, kodebranch)
+                with st.spinner("Mengambil data customer dist..."):
+                    data = fetch_customer_dist(token, kodebranch)
 
-                st.session_state["customer_prc_display"] = data
+                st.session_state["customer_dist_display"] = data
                 st.success(f"Berhasil memuat {len(data)} data!")
 
 
     # DISPLAY GRID
-    if "customer_prc_display" in st.session_state and st.session_state["customer_prc_display"]:
+    if "customer_dist_display" in st.session_state and st.session_state["customer_dist_display"]:
 
-        df = pd.DataFrame(st.session_state["customer_prc_display"])
+        df = pd.DataFrame(st.session_state["customer_dist_display"])
         df.insert(0, "No", range(1, len(df) + 1))
 
         updated_df, selected_rows = render_grid(df)
 
         st.markdown("---")
         st.info(f"Total Data : **{len(df)}**")
-
         # BUTTON SIMPAN PERUBAHAN
 
         if st.button("💾 Simpan Perubahan"):
             success = 0
 
-            original_dict = {str(r["custno"]): r for r in st.session_state["customer_prc_display"]}
+            original_dict = {str(r["custno_dist"]): r for r in st.session_state["customer_dist_display"]}
             updateby = st.session_state.user['nama']
 
             for _, row in updated_df.iterrows():
-                sid = str(row["custno"])
+                sid = str(row["custno_dist"])
 
                 if sid not in original_dict:
                     continue
@@ -231,41 +221,33 @@ def app():
 
                 # kolom yang boleh diedit
                 changed = (
-                    row["custname"] != original_row.get("custname") or
-                    row["custadd"] != original_row.get("custadd") or
-                    row["city"] != original_row.get("city") or
-                    row["type"] != original_row.get("type") or
-                    row["gharga"] != original_row.get("gharga")
+                    row["custname"] != original_row.get("custname")
                 )
 
                 if not changed:
                     continue
 
-                res = update_customer_prc(
+                res = update_customer_dist(
                     token,
                     sid,
                     row["custname"],
-                    row["custadd"],
-                    row["city"],
-                    row["type"],
-                    row["gharga"],
                     updateby
                 )
 
                 if res and res.status_code == 200:
                     success += 1
                 else:
-                    st.error(f"Gagal update Customer PRC {sid}")
+                    st.error(f"Gagal update Customer DIST {sid}")
 
             if success > 0:
-                st.success(f"Berhasil update {success} data customer PRC")
+                st.success(f"Berhasil update {success} data customer DIST")
 
                 # REFRESH DATA seperti di salesman_master_page.py
                 kodebranch = st.session_state.get("last_kodebranch")
 
                 if kodebranch:
-                    data = fetch_customer_prc(token, kodebranch)
-                    st.session_state["customer_prc_display"] = data
+                    data = fetch_customer_dist(token, kodebranch)
+                    st.session_state["customer_dist_display"] = data
 
                 st.session_state.grid_version += 1
                 st.rerun()
@@ -277,8 +259,8 @@ def app():
             if selected_rows.empty:
                 st.warning("⚠ Centang minimal satu baris")
             else:
-                ids = selected_rows["custno"].astype(str).tolist()
-                res = delete_customer_prc(token, ids)
+                ids = selected_rows["custno_dist"].astype(str).tolist()
+                res = delete_customer_dist(token, ids)
 
                 if res and res.status_code == 200:
                     st.success(f"{len(ids)} data berhasil dihapus")
@@ -286,8 +268,8 @@ def app():
                     # REFRESH DATA seperti di salesman_master_page.py
                     kodebranch = st.session_state.get("last_kodebranch")
                     if kodebranch:
-                        data = fetch_customer_prc(token, kodebranch)
-                        st.session_state["customer_prc_display"] = data
+                        data = fetch_customer_dist(token, kodebranch)
+                        st.session_state["customer_dist_display"] = data
 
                     st.session_state.grid_version += 1
                     st.rerun()

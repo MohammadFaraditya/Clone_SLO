@@ -1,24 +1,23 @@
 import streamlit as st
 import pandas as pd
-from utils.api.customer.customer_prc_api import (
+from utils.api.customer.mapping_customer_api import (
     get_region_entity_branch_mapping,
-    get_customer_prc,
-    update_customer_prc,
-    delete_customer_prc
-
+    get_data_mapping_customer,
+    delete_mapping_customer
 )
 from st_aggrid import AgGrid, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100
 
+
 # FETCH DATA PAGINATION
-def fetch_customer_prc(token, kodebranch=None):
+def fetch_all_mapping_customer(token, kodebranch=None):
     all_data = []
     offset = 0
     limit = PAGE_CHUNK
 
     while True:
-        res = get_customer_prc(
+        res = get_data_mapping_customer(
             token, offset=offset, limit=limit, kodebranch=kodebranch
         )
 
@@ -41,35 +40,29 @@ def fetch_customer_prc(token, kodebranch=None):
 # RENDER GRID
 def render_grid(df):
     df = df.copy()
+
     ordered_columns = [
-        "kodebranch",
+        "branch_prc",
         "custno",
-        "custname",
-        "custadd",
-        "city",
-        "type",
-        "gharga",
+        "custname_prc",
+        "branch_dist",
+        "custno_dist",
+        "custname_dist",
         "createdate",
         "createby",
         "updatedate",
         "updateby"
     ]
 
-    # pastikan semua kolom yang di-order ada di df, bila tidak ada buat kolom kosong agar indexing tidak error
-    for col in ordered_columns:
-        if col not in df.columns:
-            df[col] = ""
-
     df = df[ordered_columns]
 
     columnDefs = [
-        {"field": "kodebranch", "checkboxSelection": True, "headerCheckboxSelection": True},
+        {"field": "branch_prc", "checkboxSelection": True, "headerCheckboxSelection": True},
         {"field": "custno"},
-        {"field": "custname","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "custadd","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "city","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "type","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
-        {"field": "gharga","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
+        {"field": "custname_prc"},
+        {"field": "branch_dist"},
+        {"field": "custno_dist"},
+        {"field": "custname_dist"},
         {"field": "createdate"},
         {"field": "createby"},
         {"field": "updatedate"},
@@ -97,13 +90,14 @@ def render_grid(df):
         update_mode=GridUpdateMode.VALUE_CHANGED,
         enable_enterprise_modules=True,
         fit_columns_on_grid_load=False,
-        key=f"customer_prc_grid_{st.session_state.grid_version}"
+        key=f"mapping_customer_grid_{st.session_state.grid_version}"
     )
 
     updated_df = pd.DataFrame(grid_response["data"])
     selected_rows = pd.DataFrame(grid_response["selected_rows"])
 
     return updated_df, selected_rows
+
 
 # MAIN APP
 def app():
@@ -115,40 +109,40 @@ def app():
     if "grid_version" not in st.session_state:
         st.session_state.grid_version = 1
 
-    st.title("🏪 Customer Master")
+    st.title("👥 Mapping Customer")
     token = st.session_state.token
-    updateby = st.session_state.user['nama']
 
-    if st.session_state.get("refresh_customer_prc"):
-        st.session_state.refresh_customer_prc = False 
+    # AUTO REFRESH SAAT KEMBALI DARI UPLOAD
+    if st.session_state.get("refresh_mapping_customer"):
+        st.session_state.refresh_mapping_customer = False
 
         kodebranch = st.session_state.get("last_kodebranch")
         if kodebranch:
             with st.spinner("Memuat ulang data setelah upload..."):
-                data = fetch_customer_prc(token, kodebranch)
+                data = fetch_all_mapping_customer(token, kodebranch)
 
-            st.session_state["customer_prc_display"] = data
+            st.session_state["mapping_customer_display"] = data
             st.session_state.grid_version += 1
-            st.success(f"Data berhasil diperbarui (Branch: {kodebranch})")
+            st.success(f"Data diperbarui otomatis (Branch: {kodebranch})")
 
     # LOAD MAPPING REGION/ENTITY/BRANCH
-    if "customer_prc" not in st.session_state:
+    if "mapping_customer" not in st.session_state:
         with st.spinner("Memuat data region/entity/branch..."):
             res = get_region_entity_branch_mapping(token)
             if res and res.status_code == 200:
-                st.session_state.customer_prc = res.json().get("data", [])
+                st.session_state.mapping_customer = res.json().get("data", [])
             else:
                 st.error("Gagal memuat mapping region/entity/branch")
                 return
 
-    mapping_df = pd.DataFrame(st.session_state.customer_prc)
+    mapping_df = pd.DataFrame(st.session_state.mapping_customer)
 
     if "filter_expander_open" not in st.session_state:
         st.session_state.filter_expander_open = True
 
     # BUTTON UPLOAD
-    if st.button("⬆️ Upload Customer PRC"):
-        st.session_state.page = "upload_customer_prc"
+    if st.button("⬆️ Upload Mapping Customer"):
+        st.session_state.page = "upload_mapping_customer"
         st.rerun()
         return
 
@@ -195,105 +189,55 @@ def app():
             else:
                 kodebranch = selected_branch.split(" - ")[0]
                 st.session_state["last_kodebranch"] = kodebranch 
-                with st.spinner("Mengambil data customer prc..."):
-                    data = fetch_customer_prc(token, kodebranch)
+                with st.spinner("Mengambil data salesman..."):
 
-                st.session_state["customer_prc_display"] = data
+                    data = fetch_all_mapping_customer(token, kodebranch)
+                    
+                st.session_state["mapping_customer_display"] = data
                 st.success(f"Berhasil memuat {len(data)} data!")
 
 
     # DISPLAY GRID
-    if "customer_prc_display" in st.session_state and st.session_state["customer_prc_display"]:
+    if "mapping_customer_display" in st.session_state and st.session_state["mapping_customer_display"]:
 
-        df = pd.DataFrame(st.session_state["customer_prc_display"])
+        df = pd.DataFrame(st.session_state["mapping_customer_display"])
         df.insert(0, "No", range(1, len(df) + 1))
 
         updated_df, selected_rows = render_grid(df)
 
         st.markdown("---")
+
         st.info(f"Total Data : **{len(df)}**")
 
-        # BUTTON SIMPAN PERUBAHAN
-
-        if st.button("💾 Simpan Perubahan"):
-            success = 0
-
-            original_dict = {str(r["custno"]): r for r in st.session_state["customer_prc_display"]}
-            updateby = st.session_state.user['nama']
-
-            for _, row in updated_df.iterrows():
-                sid = str(row["custno"])
-
-                if sid not in original_dict:
-                    continue
-
-                original_row = original_dict[sid]
-
-                # kolom yang boleh diedit
-                changed = (
-                    row["custname"] != original_row.get("custname") or
-                    row["custadd"] != original_row.get("custadd") or
-                    row["city"] != original_row.get("city") or
-                    row["type"] != original_row.get("type") or
-                    row["gharga"] != original_row.get("gharga")
-                )
-
-                if not changed:
-                    continue
-
-                res = update_customer_prc(
-                    token,
-                    sid,
-                    row["custname"],
-                    row["custadd"],
-                    row["city"],
-                    row["type"],
-                    row["gharga"],
-                    updateby
-                )
-
-                if res and res.status_code == 200:
-                    success += 1
-                else:
-                    st.error(f"Gagal update Customer PRC {sid}")
-
-            if success > 0:
-                st.success(f"Berhasil update {success} data customer PRC")
-
-                # REFRESH DATA seperti di salesman_master_page.py
-                kodebranch = st.session_state.get("last_kodebranch")
-
-                if kodebranch:
-                    data = fetch_customer_prc(token, kodebranch)
-                    st.session_state["customer_prc_display"] = data
-
-                st.session_state.grid_version += 1
-                st.rerun()
-            else:
-                st.info("Tidak ada perubahan yang disimpan.")
-
-        # DELETE BRANCH  
+    
+        # HAPUS DATA TERPILIH
         if st.button("🗑️ Hapus Data Terpilih"):
             if selected_rows.empty:
                 st.warning("⚠ Centang minimal satu baris")
             else:
-                ids = selected_rows["custno"].astype(str).tolist()
-                res = delete_customer_prc(token, ids)
+                ids = [
+                        {
+                            "custno": row["custno"],
+                            "custno_dist": row["custno_dist"]
+                        }
+                        for _, row in selected_rows.iterrows()
+                ]
+
+                res = delete_mapping_customer(token, ids)
 
                 if res and res.status_code == 200:
                     st.success(f"{len(ids)} data berhasil dihapus")
-
-                    # REFRESH DATA seperti di salesman_master_page.py
                     kodebranch = st.session_state.get("last_kodebranch")
                     if kodebranch:
-                        data = fetch_customer_prc(token, kodebranch)
-                        st.session_state["customer_prc_display"] = data
+                        data = fetch_all_mapping_customer(token, kodebranch)
+                        st.session_state["mapping_customer_display"] = data
 
                     st.session_state.grid_version += 1
                     st.rerun()
                 else:
                     st.error("Gagal menghapus data")
-
+        
+  
 
 if __name__ == "__main__":
     app()

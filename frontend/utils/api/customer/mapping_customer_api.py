@@ -16,9 +16,8 @@ def get_region_entity_branch_mapping(token=None):
         st.error(f"Gagal mengambil mapping region-entity-branch: {e}")
         return None
     
-
-# GET DATA CUSTOMER PRC
-def get_customer_prc(token=None, offset=0, limit=50, kodebranch=None):
+# GET DATA MAPPING CUSTOMER
+def get_data_mapping_customer(token=None, offset=0, limit=50, kodebranch=None):
     if token is None:
         token = st.session_state.get("token", None)
 
@@ -39,15 +38,16 @@ def get_customer_prc(token=None, offset=0, limit=50, kodebranch=None):
     if kodebranch:
         params["kodebranch"] = kodebranch
 
+
     try:
-        response = requests.get(f"{API_URL}/customer-prc/data", headers=headers, params=params, timeout=30)
+        response = requests.get(f"{API_URL}/mapping-customer/data", headers=headers, params=params, timeout=30)
         return response
     except Exception as e:
         st.error(f"Gagal menghubungi server: {e}")
         return None
     
-# INSERT DATA CUSTOMER PRC
-def insert_customer_prc(df, token=None):
+# INSERT DATA MAPPING CUSTOMER
+def insert_mapping_customer(df, token=None):
     if token is None:
         token = st.session_state.get("token", None)
     headers = {
@@ -57,41 +57,21 @@ def insert_customer_prc(df, token=None):
     try:
         df = df.fillna("") 
         payload = df.to_dict(orient="records")
-        response = requests.post(f"{API_URL}/customer-prc/insert", json=payload, headers=headers)
+        response = requests.post(f"{API_URL}/mapping-customer/insert", json=payload, headers=headers)
         return response
     except Exception as e:
         st.error(f"Gagal menghubungi server: {e}")
         return None
-    
-# UPDATE CUSTOMER PRC
-def update_customer_prc(token, custno, custname, custadd, city, typecustomer, gharga, updateby):
-    if token is None:
-        token = st.session_state.get("token", None)
-    headers = {"Authorization" : token, "Content-Type": "application/json"}
-    payload = {
-        "custname" : custname,
-        "custadd" : custadd,
-        "city" : city,
-        "typecustomer" : typecustomer,
-        "gharga" : gharga,
-        "updateby" : updateby
-    }
 
-    try: 
-        response = requests.put(f"{API_URL}/customer-prc/update/{custno}", json=payload, headers=headers)
-        return response
-    except Exception as e:
-        st.error(f"Gagal update CUSTNO PRC {custno} : {e}")
-        return None
-    
-# DELETE CUSTOMER PRC
-def delete_customer_prc(token, custno):
+
+# DELETE MAPPING CUSTOMER
+def delete_mapping_customer(token, custno):
     if token is None:
         token = st.session_state.get("token", None)
     headers = {"Authorization":token, "Content-Type": "application/json"}
     payload = {"ids": custno}
     try:
-        return requests.delete(f"{API_URL}/customer-prc/delete", json=payload, headers=headers)
+        return requests.delete(f"{API_URL}/mapping-customer/delete", json=payload, headers=headers)
     except Exception as e:
-        st.error(f"Gagal hapus CUSTNO PRC: {e}")
+        st.error(f"Gagal hapus salesman master: {e}")
         return None

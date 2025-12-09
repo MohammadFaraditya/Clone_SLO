@@ -83,7 +83,7 @@ def get_customer_prc():
 #INSERT DATA CUSTOMER PRC
 @customer_prc_bp.route('/insert', methods=['POST'])
 @token_required
-def insert_salesman_master():
+def insert_customer_prc():
     data = request.json
     if not data or not isinstance(data, list):
         return jsonify({"error": "Data tidak valid"}), 400
@@ -168,7 +168,7 @@ def insert_salesman_master():
 def update_customer_prc(custno):
     payload = request.json
     custname = payload.get("custname")
-    custadd = payload.get("custname")
+    custadd = payload.get("custadd")
     city = payload.get("city")
     typecustomer = payload.get("typecustomer")
     gharga = payload.get("gharga")
