@@ -10,9 +10,7 @@ from streamlit import cache_data
 
 PAGE_CHUNK = 100
 
-# -------------------------
 # CACHE DATA MAPPING
-# -------------------------
 @cache_data(ttl=3600)
 def get_mapping_cached(token):
     res = get_region_entity_branch_mapping(token)
@@ -20,9 +18,8 @@ def get_mapping_cached(token):
         return res.json().get("data", [])
     return []
 
-# -------------------------
+
 # FETCH ALL DATA (PAGINATION)
-# -------------------------
 @cache_data(ttl=600)
 def fetch_all_mapping_customer(token, kodebranch=None, chunk_limit=2000):
     all_data = []
@@ -45,9 +42,8 @@ def fetch_all_mapping_customer(token, kodebranch=None, chunk_limit=2000):
 
     return all_data
 
-# -------------------------
+
 # RENDER GRID
-# -------------------------
 def render_grid(df):
     df = df.copy()
     ordered_columns = [
@@ -72,7 +68,7 @@ def render_grid(df):
     columnDefs = [
         {"field": "branch_prc", "checkboxSelection": True, "headerCheckboxSelection": True},
         {"field": "custno"},
-        {"field": "custname_prc","editable": True,"cellStyle": {"backgroundColor": "#E2EAF4"}},
+        {"field": "custname_prc"},
         {"field": "branch_dist"},
         {"field": "custno_dist"},
         {"field": "custname_dist"},
@@ -110,9 +106,7 @@ def render_grid(df):
     selected_rows = pd.DataFrame(grid_response["selected_rows"])
     return updated_df, selected_rows
 
-# -------------------------
 # MAIN APP
-# -------------------------
 def app():
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠ Anda harus login terlebih dahulu.")
@@ -188,6 +182,14 @@ def app():
         updated_df, selected_rows = render_grid(df)
         st.markdown("---")
         st.info(f"Total Data : **{len(df)}**")
+
+        st.subheader("📥 Download Data")
+        st.download_button(
+            label="📄 Download CSV",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name="mapping_customer.csv",
+            mime="text/csv"
+        )
 
         # DELETE SELECTED
         if st.button("🗑️ Hapus Data Terpilih"):

@@ -4,9 +4,7 @@ from io import BytesIO
 from datetime import datetime
 from utils.api.customer.mapping_customer_api import insert_mapping_customer
 
-# ============================
 # GENERATE TEMPLATE XLSX
-# ============================
 def generate_template():
     df = pd.DataFrame(columns=["kodebranch", "custno", "branch_dist", "custno_dist"])
     buffer = BytesIO()
@@ -15,9 +13,7 @@ def generate_template():
     buffer.seek(0)
     return buffer
 
-# ============================
 # NORMALISASI VALUE
-# ============================
 def normalize_value(val):
     if isinstance(val, list):
         return ", ".join([str(v) for v in val])
@@ -25,9 +21,8 @@ def normalize_value(val):
         return ""
     return str(val)
 
-# ============================
+
 # PROSES UPLOAD
-# ============================
 def process_upload(file, username):
     try:
         df = pd.read_excel(file, dtype=str)
@@ -60,9 +55,7 @@ def process_upload(file, username):
         st.error(f"Gagal upload data: {res.text}")
         return None
 
-# ============================
 # MAIN PAGE
-# ============================
 def app():
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠️ Anda harus login terlebih dahulu.")
@@ -88,9 +81,7 @@ def app():
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # ============================
     # UPLOAD
-    # ============================
     if not st.session_state.upload_done:
         st.subheader("📤 Upload Data Mapping Customer")
         uploaded_file = st.file_uploader("Pilih file", type=["xlsx"])
@@ -103,9 +94,7 @@ def app():
                 st.session_state.upload_done = True
                 st.rerun()
 
-    # ============================
     # HASIL UPLOAD
-    # ============================
     else:
         result_json = st.session_state.upload_result
         message = result_json.get("message", "")
@@ -130,15 +119,13 @@ def app():
         if rows:
             df_display = pd.DataFrame(rows)
             st.warning("⚠️ Sebagian data tidak diproses. Lihat tabel di bawah.")
-            st.dataframe(df_display, width="100%", hide_index=True)
+            st.dataframe(df_display, width="stretch", hide_index=True)
         else:
             st.success("🔥 Semua data berhasil ditambahkan tanpa error.")
 
         st.markdown("---")
 
-        # ============================
         # KEMBALI KE HALAMAN MAPPING CUSTOMER
-        # ============================
         if st.button("⬅️ Kembali ke Data Mapping Customer"):
             st.session_state.refresh_mapping_customer = True
             st.session_state.page = "mapping_customer"
