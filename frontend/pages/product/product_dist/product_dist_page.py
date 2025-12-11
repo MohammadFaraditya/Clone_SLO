@@ -4,24 +4,24 @@ from datetime import datetime
 from io import BytesIO
 from streamlit import cache_data
 from st_aggrid import AgGrid, GridUpdateMode, DataReturnMode
-from utils.api.customer.customer_dist_api import (
+from utils.api.product.product_dist_api import (
     get_region_entity_mapping_branch,
-    get_customer_dist,
-    update_customer_dist,
-    delete_customer_dist
+    get_product_dist,
+    update_product_dist,
+    delete_product_dist
 )
 
 PAGE_CHUNK = 100
 
 # CACHE: ambil seluruh data branch
 @cache_data(ttl=600)
-def fetch_all_customer_dist_cached(token, branch_dist=None, chunk_limit=2000):
+def fetch_all_product_dist_cached(token, branch_dist=None, chunk_limit=2000):
     all_data = []
     offset = 0
     limit = chunk_limit
 
     while True:
-        res = get_customer_dist(token, offset=offset, limit=limit, branch_dist=branch_dist)
+        res = get_product_dist(token, offset=offset, limit=limit, branch_dist=branch_dist)
         if not res or res.status_code != 200:
             break
 
@@ -49,8 +49,8 @@ def render_grid(df, grid_key):
     df_local = df.copy()
     ordered_columns = [
         "branch_dist",
-        "custno_dist",
-        "custname",
+        "pcode_dist",
+        "pcodename",
         "createdate",
         "createby",
         "updatedate",
@@ -65,8 +65,8 @@ def render_grid(df, grid_key):
 
     columnDefs = [
         {"field": "branch_dist", "checkboxSelection": True, "headerCheckboxSelection": True, "pinned": "left"},
-        {"field": "custno_dist", "pinned": "left"},
-        {"field": "custname", "editable": True, "cellStyle": {"backgroundColor": "#E2EAF4"}},
+        {"field": "pcode_dist", "pinned": "left"},
+        {"field": "pcodename", "editable": True, "cellStyle": {"backgroundColor": "#E2EAF4"}},
         {"field": "createdate"},
         {"field": "createby"},
         {"field": "updatedate"},
@@ -115,27 +115,27 @@ def app():
     updateby = st.session_state.user.get("nama", "SYSTEM")
 
     st.session_state.setdefault("grid_version", 1)
-    st.session_state.setdefault("customer_dist_full", None)
+    st.session_state.setdefault("product_dist_full", None)
     st.session_state.setdefault("last_branch_dist", None)
-    st.session_state.setdefault("mapping_customer_dist", None)
+    st.session_state.setdefault("mapping_product_dist", None)
     st.session_state.setdefault("show_delete_confirm", False)
     st.session_state.setdefault("delete_ids", [])
 
-    st.title("🏪 Customer Dist")
+    st.title("🍘 Product Dist")
 
     # Load mapping
-    if st.session_state.get("mapping_customer_dist") is None:
+    if st.session_state.get("mapping_product_dist") is None:
         with st.spinner("Memuat mapping region/entity/branch..."):
-            st.session_state["mapping_customer_dist"] = get_mapping_cached(token)
+            st.session_state["mapping_product_dist"] = get_mapping_cached(token)
 
-    mapping_df = pd.DataFrame(st.session_state.get("mapping_customer_dist", []))
+    mapping_df = pd.DataFrame(st.session_state.get("mapping_product_dist", []))
 
     if "filter_expander_open" not in st.session_state:
         st.session_state.filter_expander_open = True
 
     # BUTTON UPLOAD
-    if st.button("⬆️ Upload Customer Dist"):
-        st.session_state.page = "upload_customer_dist"
+    if st.button("⬆️ Upload Product Dist"):
+        st.session_state.page = "upload_product_dist"
         st.rerun()
         return
 
@@ -169,9 +169,9 @@ def app():
             else:
                 branch_dist = selected_branch.split(" - ")[0]
                 st.session_state["last_branch_dist"] = branch_dist
-                with st.spinner("Mengambil data customer dist..."):
-                    all_rows = fetch_all_customer_dist_cached(token, branch_dist)
-                st.session_state["customer_dist_full"] = all_rows
+                with st.spinner("Mengambil data product dist..."):
+                    all_rows = fetch_all_product_dist_cached(token, branch_dist)
+                st.session_state["product_dist_full"] = all_rows
                 st.session_state["grid_version"] += 1
                 st.success(f"Berhasil memuat {len(all_rows)} data!")
 
@@ -179,30 +179,30 @@ def app():
     cols = st.columns([1, 6, 1])
     with cols[0]:
         if st.button("🔄 Force Reload"):
-            fetch_all_customer_dist_cached.clear()
+            fetch_all_product_dist_cached.clear()
             get_mapping_cached.clear()
             branch_dist = st.session_state.get("last_branch_dist")
             if branch_dist:
                 with st.spinner("Memuat ulang data (fresh)..."):
-                    all_rows = fetch_all_customer_dist_cached(token, branch_dist)
-                st.session_state["customer_dist_full"] = all_rows
+                    all_rows = fetch_all_product_dist_cached(token, branch_dist)
+                st.session_state["product_dist_full"] = all_rows
                 st.session_state["grid_version"] += 1
                 st.success(f"Reload selesai, {len(all_rows)} rows.")
 
     with cols[2]:
         if st.button("🔁 Clear Local Data"):
-            st.session_state["customer_dist_full"] = None
+            st.session_state["product_dist_full"] = None
             st.session_state["last_branch_dist"] = None
             st.session_state["grid_version"] += 1
             st.info("Data lokal dihapus. Terapkan filter lagi untuk memuat data.")
 
     # DISPLAY GRID
-    if st.session_state.get("customer_dist_full"):
-        full_data = st.session_state["customer_dist_full"]
+    if st.session_state.get("product_dist_full"):
+        full_data = st.session_state["product_dist_full"]
         df = pd.DataFrame(full_data)
         df.insert(0, "No", range(1, len(df) + 1))
 
-        updated_df, selected_rows = render_grid(df, grid_key=f"customer_dist_grid_{st.session_state.grid_version}")
+        updated_df, selected_rows = render_grid(df, grid_key=f"product_dist_grid_{st.session_state.grid_version}")
 
         st.markdown("---")
         st.info(f"Total Data : **{len(df)}**")
@@ -210,18 +210,18 @@ def app():
         # SAVE CHANGES
         if st.button("💾 Simpan Perubahan"):
             changed_rows = []
-            original_map = {str(r["custno_dist"]): r for r in full_data}
+            original_map = {str(r["pcode_dist"]): r for r in full_data}
 
             for _, row in updated_df.iterrows():
-                sid = str(row["custno_dist"])
+                sid = str(row["pcode_dist"])
                 if sid not in original_map:
                     continue
                 orig = original_map[sid]
 
-                if (row["custname"] != orig.get("custname")):
+                if (row["pcodename"] != orig.get("pcodename")):
                     changed_rows.append({
-                        "custno_dist": sid,
-                        "custname": row["custname"] or "",
+                        "pcode_dist": sid,
+                        "pcodename": row["pcodename"] or "",
                         "updateby": updateby
                     })
 
@@ -232,31 +232,31 @@ def app():
                 fail_list = []
                 with st.spinner(f"Menyimpan {len(changed_rows)} perubahan..."):
                     for r in changed_rows:
-                        res = update_customer_dist(token, r["custno_dist"], r["custname"], r["updateby"])
+                        res = update_product_dist(token, r["pcode_dist"], r["pcodename"], r["updateby"])
                         if res and res.status_code == 200:
                             success += 1
                             # update lokal
-                            for local_r in st.session_state["customer_dist_full"]:
-                                if str(local_r.get("custno_dist")) == r["custno_dist"]:
-                                    local_r["custname"] = r["custname"]
+                            for local_r in st.session_state["product_dist_full"]:
+                                if str(local_r.get("pcode_dist")) == r["pcode_dist"]:
+                                    local_r["pcodename"] = r["pcodename"]
                                     local_r["updatedate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                     local_r["updateby"] = updateby
                                     break
                         else:
-                            fail_list.append(r["custno_dist"])
+                            fail_list.append(r["pcode_dist"])
 
                 if success > 0:
                     st.success(f"{success} perubahan berhasil disimpan.")
                     st.session_state["grid_version"] += 1
                 if fail_list:
-                    st.error(f"Gagal menyimpan untuk custno_dist: {', '.join(fail_list)}")
+                    st.error(f"Gagal menyimpan untuk pcode_dist: {', '.join(fail_list)}")
 
         # DELETE SELECTED
         if st.button("🗑️ Hapus Data Terpilih"):
             if selected_rows.empty:
                 st.warning("⚠ Centang minimal satu baris")
             else:
-                st.session_state["delete_ids"] = selected_rows["custno_dist"].astype(str).tolist()
+                st.session_state["delete_ids"] = selected_rows["pcode_dist"].astype(str).tolist()
                 st.session_state["show_delete_confirm"] = True
 
         if st.session_state.get("show_delete_confirm", False):
@@ -266,11 +266,11 @@ def app():
             with c1:
                 if st.button("Ya, Hapus", key="confirm_delete_yes"):
                     ids = st.session_state["delete_ids"]
-                    res = delete_customer_dist(token, ids)
+                    res = delete_product_dist(token, ids)
                     if res and res.status_code == 200:
-                        st.session_state["customer_dist_full"] = [
-                            r for r in st.session_state["customer_dist_full"]
-                            if str(r.get("custno_dist")) not in set(ids)
+                        st.session_state["product_dist_full"] = [
+                            r for r in st.session_state["product_dist_full"]
+                            if str(r.get("pcode_dist")) not in set(ids)
                         ]
                         st.success(f"{len(ids)} data berhasil dihapus.")
                         st.session_state["grid_version"] += 1
@@ -294,7 +294,7 @@ def app():
             st.download_button(
                 label="Download .csv",
                 data=excel_bytes,
-                file_name=f"customer_dist_{st.session_state.get('last_branch_dist','all')}.csv",
+                file_name=f"product_dist_{st.session_state.get('last_branch_dist','all')}.csv",
                 mime="text/csv"
             )
 

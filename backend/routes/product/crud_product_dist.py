@@ -5,7 +5,7 @@ from functools import wraps
 from db import get_db_connection, release_db_connection
 from psycopg2.extras import RealDictCursor, execute_values
 
-customer_dist_bp = Blueprint('customer_dist',__name__, url_prefix='/customer-dist')
+product_dist_bp = Blueprint('product_dist',__name__, url_prefix='/product-dist')
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev_secret')
 
 #MIDDLEWARE TOKEN
@@ -22,8 +22,8 @@ def token_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# GET DATA CUSTOMER DIST
-@customer_dist_bp.route('/data', methods=['GET'])
+# GET DATA PRODUCT DIST
+@product_dist_bp.route('/data', methods=['GET'])
 @token_required
 def get_customer_prc():
     try:
@@ -48,18 +48,18 @@ def get_customer_prc():
 
     try:
         cursor.execute("""
-                SELECT cp.custno_dist, cp.custname, cp.branch_dist, b.nama_branch_dist, cp.createdate, cp.createby, cp.updatedate, cp.updateby
-                FROM customer_dist cp
-                INNER JOIN branch_dist b ON cp.branch_dist = b.branch_dist
-                WHERE cp.branch_dist = %s
-                ORDER BY cp.custno_dist
+                SELECT pd.pcode_dist, pd.pcodename, pd.branch_dist, b.nama_branch_dist, pd.createdate, pd.createby, pd.updatedate, pd.updateby
+                FROM product_dist pd
+                INNER JOIN branch_dist b ON pd.branch_dist = b.branch_dist
+                WHERE pd.branch_dist = %s
+                ORDER BY pd.pcode_dist
                 LIMIT %s OFFSET %s
             """, (kodebranch, limit, offset))
         data = cursor.fetchall()
 
         cursor.execute("""
                 SELECT COUNT(1) AS total
-                FROM customer_dist 
+                FROM product_dist 
                 WHERE branch_dist = %s
             """, (kodebranch,))
         
@@ -80,7 +80,7 @@ def get_customer_prc():
         release_db_connection(conn)
 
 #INSERT DATA CUSTOMER DIST
-@customer_dist_bp.route('/insert', methods=['POST'])
+@product_dist_bp.route('/insert', methods=['POST'])
 @token_required
 def insert_customer_dist():
     data = request.json
@@ -90,14 +90,14 @@ def insert_customer_dist():
     rows = []
 
     for row in data:
-        custno_dist = str(row.get("custno_dist")).strip()
-        custname = row.get("custname")
+        pcode_dist = str(row.get("pcode_dist")).strip()
+        pcodename = row.get("pcodename")
         branch_dist = str(row.get("branch_dist")).strip()
 
         createdate = row.get("createdate") or datetime.now()
         createby = row.get("createby") or "SYSTEM"
 
-        rows.append((custno_dist, custname, branch_dist, createdate, createby))
+        rows.append((pcode_dist, pcodename, branch_dist, createdate, createby))
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -105,11 +105,11 @@ def insert_customer_dist():
     # --- CEK DUPLIKAT DI DATABASE
     ids = [r[0] for r in rows]
     cur.execute(
-        "SELECT custno_dist FROM customer_dist WHERE custno_dist = ANY(%s)",
+        "SELECT pcode_dist FROM product_dist WHERE pcode_dist = ANY(%s)",
         (ids,)
     )
     existing_rows = cur.fetchall()
-    existing_ids = {r["custno_dist"] for r in existing_rows}
+    existing_ids = {r["pcode_dist"] for r in existing_rows}
 
     # --- CEK DUPLIKAT INTERNAL DALAM PAYLOAD
     internal_seen = set()
@@ -130,14 +130,14 @@ def insert_customer_dist():
     invalid_kodebranch = []
 
     for r in rows:
-        custno_dist, custname, branch_dist, createdate, createby = r
+        pcode_dist, pcodename, branch_dist, createdate, createby = r
 
         # Skip duplikat database
-        if custno_dist in existing_ids:
+        if pcode_dist in existing_ids:
             continue
 
         # Skip duplikat internal payload
-        if custno_dist in internal_duplicates:
+        if pcode_dist in internal_duplicates:
             continue
 
         # Skip branch tidak valid
@@ -150,8 +150,8 @@ def insert_customer_dist():
     inserted_count = 0
     if rows_valid:
         insert_sql = """
-        INSERT INTO customer_dist
-        (custno_dist, custname, branch_dist, createdate, createby)
+        INSERT INTO product_dist
+        (pcode_dist, pcodename, branch_dist, createdate, createby)
         VALUES %s
         """
         execute_values(cur, insert_sql, rows_valid, page_size=500)
@@ -169,12 +169,12 @@ def insert_customer_dist():
     }), 200
 
 
-# UPDATE CUSTOMER DIST
-@customer_dist_bp.route('/update/<custno_dist>', methods=['PUT'])
+# UPDATE PRODUCT DIST
+@product_dist_bp.route('/update/<pcode_dist>', methods=['PUT'])
 @token_required
-def update_customer_prc(custno_dist):
+def update_customer_prc(pcode_dist):
     payload = request.json
-    custname = payload.get("custname")
+    pcodename = payload.get("pcodename")
     updateby = payload.get("updateby")
 
     conn = get_db_connection()
@@ -182,8 +182,8 @@ def update_customer_prc(custno_dist):
 
     try:
         cursor.execute(
-            "UPDATE customer_dist SET custname=%s, updatedate=%s, updateby=%s where custno_dist=%s ",
-            (custname, datetime.now(), updateby, custno_dist)
+            "UPDATE product_dist SET pcodename=%s, updatedate=%s, updateby=%s where pcode_dist=%s ",
+            (pcodename, datetime.now(), updateby, pcode_dist)
         )
         conn.commit()
     except Exception as e:
@@ -196,23 +196,24 @@ def update_customer_prc(custno_dist):
     cursor.close()
     conn.close()
     release_db_connection(conn)
-    return jsonify({"message" : f" Customer Dist {custno_dist} berhasil diupdate"}), 200
+    return jsonify({"message" : f" Customer Dist {pcode_dist} berhasil diupdate"}), 200
 
-# DELETE CUSTOMER DIST
-@customer_dist_bp.route('/delete', methods=['DELETE'])
+
+# DELETE PRODUCT DIST
+@product_dist_bp.route('/delete', methods=['DELETE'])
 @token_required
 def delete_customer_prc_route():
     payload = request.json
-    custno_dist = payload.get("ids", [])
+    pcode_dist = payload.get("ids", [])
 
-    if not custno_dist or not isinstance(custno_dist, list):
-        return jsonify({"error": "Harus mengirim list custno dist"}), 400
+    if not pcode_dist or not isinstance(pcode_dist, list):
+        return jsonify({"error": "Harus mengirim list pcode dist"}), 400
     
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        format_strings = ",".join(["%s"] * len(custno_dist))
-        cursor.execute(f"DELETE FROM customer_dist where custno_dist IN ({format_strings})", tuple(custno_dist))
+        format_strings = ",".join(["%s"] * len(pcode_dist))
+        cursor.execute(f"DELETE FROM product_dist where pcode_dist IN ({format_strings})", tuple(pcode_dist))
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -223,4 +224,4 @@ def delete_customer_prc_route():
     cursor.close()
     conn.close()
     release_db_connection(conn)
-    return jsonify({"message" : f"{len(custno_dist)} entity berhasil dihapus"}),200
+    return jsonify({"message" : f"{len(pcode_dist)} entity berhasil dihapus"}),200

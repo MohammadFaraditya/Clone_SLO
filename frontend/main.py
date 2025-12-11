@@ -16,6 +16,8 @@ if "collapse_salesman" not in st.session_state:
     st.session_state.collapse_salesman = False
 if "collapse_customer" not in st.session_state:
     st.session_state.collapse_customer = False
+if "collapse_product" not in st.session_state:
+    st.session_state.collapse_product = False    
 
 # SIDEBAR CSS FIX
 st.markdown("""
@@ -169,6 +171,15 @@ else:
 
             st.markdown("---")
 
+            # PRODUCT MENU
+            if st.button("▶️ Product", key="product_menu", use_container_width=True):
+                st.session_state.collapse_product = not st.session_state.collapse_product
+
+            if st.session_state.get("collapse_product", False):
+                if st.button("Product Dist", key="prod1", use_container_width=True):
+                    st.session_state.page = "product_dist"; st.rerun()
+
+
             # USER CARD + LOGOUT
             st.markdown(f"""
                 <div style="text-align: center; padding: 0.5rem 0;">
@@ -295,4 +306,14 @@ else:
     elif st.session_state.page == "upload_mapping_customer":
         from pages.customer.mapping_customer import upload_mapping_customer
         upload_mapping_customer.app()
+
+    
+    # PRODUCT DIST
+    elif st.session_state.page == "product_dist":
+        from pages.product.product_dist import product_dist_page
+        product_dist_page.app()
+
+    elif st.session_state.page == "upload_product_dist":
+        from pages.product.product_dist import upload_product_dist
+        upload_product_dist.app()
 
