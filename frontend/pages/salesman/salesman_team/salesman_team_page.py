@@ -5,7 +5,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100  
 
-# Fetch semua data region
+# Fetch semua data salesman team
 def fetch_all_team(token):
     all_data = []
     offset = 0

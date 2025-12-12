@@ -178,6 +178,9 @@ else:
             if st.session_state.get("collapse_product", False):
                 if st.button("Product Dist", key="prod1", use_container_width=True):
                     st.session_state.page = "product_dist"; st.rerun()
+                
+                if st.button("Product PRC", key="prod2", use_container_width=True):
+                    st.session_state.page = "product_prc"; st.rerun()
 
 
             # USER CARD + LOGOUT
@@ -316,4 +319,13 @@ else:
     elif st.session_state.page == "upload_product_dist":
         from pages.product.product_dist import upload_product_dist
         upload_product_dist.app()
+
+    # PRODUCT PRC
+    elif st.session_state.page == "product_prc":
+        from pages.product.product_prc import product_prc_page
+        product_prc_page.app()
+
+    elif st.session_state.page == "upload_product_prc":
+        from pages.product.product_prc import upload_product_prc
+        upload_product_prc.app()
 
