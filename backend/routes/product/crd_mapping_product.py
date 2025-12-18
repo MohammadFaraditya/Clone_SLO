@@ -5,10 +5,10 @@ from functools import wraps
 from db import get_db_connection, release_db_connection
 from psycopg2.extras import RealDictCursor, execute_values
 
-mapping_customer_bp = Blueprint('mapping_customer', __name__, url_prefix='/mapping-customer')
-SECRET_KEY = os.getenv('SECRET_KEY', "dev_secret")
+mapping_product_bp = Blueprint('mapping_product',__name__, url_prefix='/mapping-product')
+SECRET_KEY = os.getenv('SECRET_KEY', 'dev_secret')
 
-# Middleware untuk verifikasi token
+#MIDDLEWARE TOKEN
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -18,14 +18,14 @@ def token_required(f):
         try:
             jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         except Exception:
-            return jsonify({"error" : "Token tidak valid atau kedaluwarsa"}), 401
+            return jsonify({"error" : "Token tidak valid atau kadaluwarsa"}), 401
         return f(*args, **kwargs)
-    return decorated 
+    return decorated
 
-# GET DATA MAPPING CUSTOMER
-@mapping_customer_bp.route('/data', methods=['GET'])
+# GET DATA MAPPING PRODUCT
+@mapping_product_bp.route('/data', methods=['GET'])
 @token_required
-def get_mapping_customer():
+def get_mapping_product():
     try:
         offset = int(request.args.get('offset', 0))
     except Exception:
@@ -36,7 +36,7 @@ def get_mapping_customer():
     except Exception:
         limit = 50
 
-    kodebranch = request.args.get('kodebranch')
+    kodebranch = request.args.get('branch_dist')
 
     if not kodebranch:
         return jsonify({
@@ -47,19 +47,17 @@ def get_mapping_customer():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        
         cursor.execute("""
-                SELECT * 
-                FROM mapping_customer
-                WHERE branch_prc = %s
+                SELECT * FROM mapping_product
+                WHERE branch_dist = %s
                 LIMIT %s OFFSET %s
             """, (kodebranch, limit, offset))
         data = cursor.fetchall()
 
         cursor.execute("""
                 SELECT COUNT(1) AS total
-                FROM mapping_customer
-                WHERE branch_prc = %s
+                FROM mapping_product 
+                WHERE branch_dist = %s
             """, (kodebranch,))
         
 
@@ -77,8 +75,8 @@ def get_mapping_customer():
         cursor.close()
         release_db_connection(conn)
 
-#INSERT DATA MAPPING CUSTOMER
-@mapping_customer_bp.route('/insert', methods=['POST'])
+#INSERT DATA MAPPING PRODUCT
+@mapping_product_bp.route('/insert', methods=['POST'])
 @token_required
 def insert_mapping_customer():
     data = request.json
@@ -88,31 +86,31 @@ def insert_mapping_customer():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # Ambil semua custno & custno_dist dari request
-    custnos_prc = [str(row.get("custno")).strip() for row in data]
-    custnos_dist = [str(row.get("custno_dist")).strip() for row in data]
+    # Ambil semua pcode_prc & pcode_dist dari request
+    pcodes_prc = [str(row.get("pcode_prc")).strip() for row in data]
+    pcodes_dist = [str(row.get("pcode_dist")).strip() for row in data]
 
-    # CEK DUPLIKAT di mapping_customer
+    # CEK DUPLIKAT di mapping_product
     cur.execute(
-        "SELECT custno, custno_dist FROM mapping_customer WHERE custno = ANY(%s) AND custno_dist = ANY(%s)",
-        (custnos_prc, custnos_dist)
+        "SELECT pcode_prc, pcode_dist FROM mapping_product WHERE pcode_prc = ANY(%s) AND pcode_dist = ANY(%s)",
+        (pcodes_prc, pcodes_dist)
     )
     existing_rows = cur.fetchall()
-    existing_pairs = {(r["custno"], r["custno_dist"]) for r in existing_rows}
+    existing_pairs = {(r["pcode_prc"], r["pcode_dist"]) for r in existing_rows}
 
-    # Ambil data customer_prc
+    # Ambil data product_prc
     cur.execute(
-        "SELECT custno, custname, kodebranch FROM customer_prc WHERE custno = ANY(%s)",
-        (custnos_prc,)
+        "SELECT pcode, pcodename FROM product_prc WHERE pcode = ANY(%s)",
+        (pcodes_prc,)
     )
-    customer_prc_data = {r["custno"]: r for r in cur.fetchall()}
+    pcode_prc_data = {r["pcode"]: r for r in cur.fetchall()}
 
-    # Ambil data customer_dist
+    # Ambil data product_dist
     cur.execute(
-        "SELECT custno_dist, custname, branch_dist FROM customer_dist WHERE custno_dist = ANY(%s)",
-        (custnos_dist,)
+        "SELECT pcode_dist, pcodename, branch_dist FROM product_dist WHERE pcode_dist = ANY(%s)",
+        (pcodes_dist,)
     )
-    customer_dist_data = {r["custno_dist"]: r for r in cur.fetchall()}
+    pcode_dist_data = {r["pcode_dist"]: r for r in cur.fetchall()}
 
     rows_valid = []
     skipped_prc = []
@@ -120,41 +118,39 @@ def insert_mapping_customer():
     skipped_duplicate = []
 
     for row in data:
-        custno = str(row.get("custno")).strip()
-        custno_dist = str(row.get("custno_dist")).strip()
-        kodebranch = row.get("kodebranch")
+        pcode_prc = str(row.get("pcode_prc")).strip()
+        pcode_dist = str(row.get("pcode_dist")).strip()
         branch_dist = row.get("branch_dist")
         createby = row.get("createby") or "SYSTEM"
         createdate = row.get("createdate") or datetime.now()
 
         # CEK DUPLIKAT
-        if (custno, custno_dist) in existing_pairs:
-            skipped_duplicate.append((custno, custno_dist))
+        if (pcode_prc, pcode_dist) in existing_pairs:
+            skipped_duplicate.append((pcode_prc, pcode_dist))
             continue
 
-        # CEK CUSTOMER PRC
-        prc_data = customer_prc_data.get(custno)
-        if not prc_data or prc_data["kodebranch"] != kodebranch:
-            skipped_prc.append(custno)
+        # CEK PRODUCT PRC
+        prc_data = pcode_prc_data.get(pcode_prc)
+        if not prc_data or prc_data["pcode"] != pcode_prc:
+            skipped_prc.append(pcode_prc)
             continue
-        custname_prc = prc_data["custname"]
+        pcodename_prc = prc_data["pcodename"]
 
         # CEK CUSTOMER DIST
-        dist_data = customer_dist_data.get(custno_dist)
+        dist_data = pcode_dist_data.get(pcode_dist)
         if not dist_data or dist_data["branch_dist"] != branch_dist:
-            skipped_dist.append(custno_dist)
+            skipped_dist.append(pcode_dist)
             continue
-        custname_dist = dist_data["custname"]
+        pcodename_dist = dist_data["pcodename"]
 
         # Jika semua valid → tambahkan ke list insert
         rows_valid.append((
-            custno,
-            custname_prc,
-            custno_dist,
-            custname_dist,
+            pcode_prc,
+            pcodename_prc,
+            pcode_dist,
+            pcodename_dist,
             createdate,
             createby,
-            kodebranch,
             branch_dist
         ))
 
@@ -162,8 +158,8 @@ def insert_mapping_customer():
     inserted_count = 0
     if rows_valid:
         insert_sql = """
-            INSERT INTO mapping_customer
-            (custno, custname_prc, custno_dist, custname_dist, createdate, createby, branch_prc, branch_dist)
+            INSERT INTO mapping_product
+            (pcode_prc, pcode_prc_name, pcode_dist, pcode_dist_name, createdate, createby, branch_dist)
             VALUES %s
         """
         execute_values(cur, insert_sql, rows_valid, page_size=500)
@@ -181,19 +177,19 @@ def insert_mapping_customer():
     }), 200
 
 # DELETE MAPPING CUSTOMER
-@mapping_customer_bp.route('/delete', methods=['DELETE'])
+@mapping_product_bp.route('/delete', methods=['DELETE'])
 @token_required
-def delete_mapping_customer():
+def delete_mapping_product():
     payload = request.json
-    cust_pairs = payload.get("ids", [])
+    pcode_pairs = payload.get("ids", [])
 
-    if not cust_pairs or not isinstance(cust_pairs, list):
-        return jsonify({"error": "Harus mengirim list pasangan custno & custno_dist"}), 400
+    if not pcode_pairs or not isinstance(pcode_pairs, list):
+        return jsonify({"error": "Harus mengirim list pasangan pcode_prc & pcode_dist"}), 400
 
     valid_pairs = [
-        (p.get("custno"), p.get("custno_dist"))
-        for p in cust_pairs
-        if p.get("custno") and p.get("custno_dist")
+        (p.get("pcode_prc"), p.get("pcode_dist"))
+        for p in pcode_pairs
+        if p.get("pcode_prc") and p.get("pcode_dist")
     ]
 
     if not valid_pairs:
@@ -209,8 +205,8 @@ def delete_mapping_customer():
         )
 
         delete_sql = f"""
-            DELETE FROM mapping_customer
-            WHERE (custno, custno_dist) IN ({values_sql})
+            DELETE FROM mapping_product
+            WHERE (pcode_prc, pcode_dist) IN ({values_sql})
         """
 
         cur.execute(delete_sql)
@@ -225,5 +221,3 @@ def delete_mapping_customer():
     cur.close()
     release_db_connection(conn)
     return jsonify({"message": f"{len(valid_pairs)} record berhasil dihapus"}), 200
-
-

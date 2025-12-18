@@ -42,7 +42,7 @@ def get_product_prc():
     try:
         cursor.execute("""
                 SELECT prlin, prlinname, pcode, pcodename, unit1, unit2, unit3,
-                convunit2, convunit3, sellprice1, sellprice2, sellprice3, createdate, createby, updatedate, updateby 
+                convunit2, convunit3, createdate, createby, updatedate, updateby 
                 FROM product_prc
                 ORDER BY prlin
                 LIMIT %s OFFSET %s
@@ -66,8 +66,6 @@ def get_product_prc():
         }), 200
     
     finally:
-        cursor.close()
-        
         release_db_connection(conn)
 
 
@@ -93,14 +91,10 @@ def insert_product_prc():
   
         convunit2 = row.get("convunit2")
         convunit3 = row.get("convunit3")
-        sellprice1 = row.get("sellprice1")
-        sellprice2 = row.get("sellprice2")
-        sellprice3 = row.get("sellprice3")
         createdate = row.get("createdate") or datetime.now()
         createby = row.get("createby") or "SYSTEM"
 
-        rows.append((pcode, pcodename, unit1, unit2, unit3, convunit2, convunit3, createdate, createby, prlin, prlinname
-                     , sellprice1, sellprice2, sellprice3))
+        rows.append((pcode, pcodename, unit1, unit2, unit3, convunit2, convunit3, createdate, createby, prlin, prlinname))
 
         ids.append(pcode)  
 
@@ -121,14 +115,13 @@ def insert_product_prc():
     if rows_to_insert:
         insert_sql = """
         INSERT INTO product_prc
-        (pcode, pcodename, unit1, unit2, unit3, convunit2, convunit3, createdate, createby, prlin, prlinname, sellprice1, sellprice2, sellprice3)
+        (pcode, pcodename, unit1, unit2, unit3, convunit2, convunit3, createdate, createby, prlin, prlinname)
         VALUES %s
         """
         execute_values(cur, insert_sql, rows_to_insert, page_size=500)
         inserted_count = len(rows_to_insert)
 
     conn.commit()
-    cur.close()
     release_db_connection(conn)
 
     return jsonify({
@@ -150,9 +143,6 @@ def update_pcode_prc(pcode):
     convunit3 = payload.get("convunit3")
     prlin = payload.get("prlin")
     prlinname = payload.get("prlinname")
-    sellprice1 = payload.get("sellprice1")
-    sellprice2 = payload.get("sellprice2")
-    sellprice3 = payload.get("sellprice3")
     updateby = payload.get("updateby")
 
     conn = get_db_connection()
@@ -160,22 +150,19 @@ def update_pcode_prc(pcode):
 
     try:
         cursor.execute(
-            "UPDATE product_prc SET pcodename=%s, unit1=%s, unit2=%s, unit3=%s, convunit2=%s, convunit3=%s, prlin=%s, prlinname=%s,sellprice1=%s, sellprice2=%s, sellprice3=%s, updatedate=%s, updateby=%s where pcode=%s ",
-            (pcodename, unit1, unit2, unit3, convunit2, convunit3, prlin, prlinname, sellprice1, sellprice2,
-             sellprice3, datetime.now(), updateby, pcode)
+            "UPDATE product_prc SET pcodename=%s, unit1=%s, unit2=%s, unit3=%s, convunit2=%s, convunit3=%s, prlin=%s, prlinname=%s, updatedate=%s, updateby=%s where pcode=%s ",
+            (pcodename, unit1, unit2, unit3, convunit2, convunit3, prlin, prlinname, datetime.now(), updateby, pcode)
         )
         conn.commit()
     except Exception as e:
         conn.rollback()
-        cursor.close()
         
         release_db_connection(conn)
         return jsonify({"error": str(e)}), 500
-    
-    cursor.close()
+
     
     release_db_connection(conn)
-    return jsonify({"message" : f" Customer Prc {pcode} berhasil diupdate"}), 200
+    return jsonify({"message" : f" Product Prc {pcode} berhasil diupdate"}), 200
 
 
 # DELETE CUSTOMER PRC
@@ -196,11 +183,8 @@ def delete_product_prc_route():
         conn.commit()
     except Exception as e:
         conn.rollback()
-        cursor.close()
         
         return jsonify({"error": str(e)}), 500
-    
-    cursor.close()
     
     release_db_connection(conn)
     return jsonify({"message" : f"{len(pcode)} entity berhasil dihapus"}),200

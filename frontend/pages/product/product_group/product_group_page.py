@@ -1,25 +1,25 @@
 import streamlit as st
 import pandas as pd
-from utils.api.product.product_prc_api import get_product_prc, update_product_prc, delete_product_prc
+from utils.api.product.product_group_api import get_product_group, update_product_group, delete_product_group
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 PAGE_CHUNK = 100  
 
-# Fetch semua data product prc
-def fetch_all_product_prc(token):
+# Fetch semua data product group
+def fetch_all_product_group(token):
     all_data = []
     offset = 0
     limit = PAGE_CHUNK
 
     while True:
-        res = get_product_prc(token, offset=offset, limit=limit)
+        res = get_product_group(token, offset=offset, limit=limit)
         if not res:
             break
         if res.status_code != 200:
             try:
-                err = res.json().get("error") or res.json().get("message") or "Gagal memuat data product prc."
+                err = res.json().get("error") or res.json().get("message") or "Gagal memuat data product group."
             except Exception:
-                err = "Gagal memuat data product prc."
+                err = "Gagal memuat data product group."
             st.error(err)
             break
 
@@ -39,15 +39,15 @@ def fetch_all_product_prc(token):
 def render_grid(df):
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_column("No", header_name="No", width=60, pinned="left", editable=False)
-    gb.configure_column("prlin", header_name="KODE PRLIN", editable=False)
-    gb.configure_column("prlinname", header_name="NAMA PRLIN NAME", editable=False)
+    gb.configure_column("brand", header_name="BRAND", editable=False)
     gb.configure_column("pcode", header_name="PCODE", width=150, editable=False)
-    gb.configure_column("pcodename", header_name="PCODENAME", width=250, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("unit1", header_name="UNIT 1", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("unit2", header_name="UNIT 2", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("unit3", header_name="UNIT 3", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("convunit2", header_name="KONVERSI UNIT 2", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("convunit3", header_name="KONVERSI UNIT 3", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("pcodename", header_name="PCODENAME", width=250, editable=False)
+    gb.configure_column("product_group_1", header_name="PRODUCT GROUP 1", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("product_group_2", header_name="PRODUCT GROUP 2", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("product_group_3", header_name="PRODUCT GROUP 3", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("category_item", header_name="CATEGORY ITEM", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("vtkp", header_name="VTKP", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
+    gb.configure_column("npd", header_name="NPD", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
     gb.configure_column("createdate", header_name="Created Date", editable=False)
     gb.configure_column("createby", header_name="Create By", editable=False)
     gb.configure_column("updatedate", header_name="Update Date", editable=False)
@@ -68,7 +68,7 @@ def render_grid(df):
         fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=True,
-        key="product_prc_grid_all"
+        key="product_group_grid_all"
     )
 
     updated_df = pd.DataFrame(grid_response['data']).drop(columns=["No"], errors='ignore')
@@ -82,32 +82,32 @@ def app():
         st.session_state.page = "main"
         return
 
-    st.title("🍘 PRODUCT PRC")
+    st.title("🍱 PRODUCT GROUP")
 
     token = st.session_state.token
     updateby = st.session_state.user['nama']
 
-    if st.button("⬆️ Upload product prc"):
-        st.session_state.page = "upload_product_prc"
+    if st.button("⬆️ Upload product group"):
+        st.session_state.page = "upload_product_group"
         st.rerun()
         return
 
     # Refresh data hanya jika belum ada atau flag refresh aktif
-    if "product_prc_data" not in st.session_state or st.session_state.get("refresh_product_prc", True):
-        with st.spinner("Memuat semua data product prc..."):
-            all_data, total_count = fetch_all_product_prc(token)
-            st.session_state["product_prc_data"] = all_data
-            st.session_state["product_prc_total"] = total_count
-            st.session_state["refresh_product_prc"] = False
+    if "product_group_data" not in st.session_state or st.session_state.get("refresh_product_group", True):
+        with st.spinner("Memuat semua data product group..."):
+            all_data, total_count = fetch_all_product_group(token)
+            st.session_state["product_group_data"] = all_data
+            st.session_state["product_group_total"] = total_count
+            st.session_state["refresh_product_group"] = False
 
-    data = st.session_state.get("product_prc_data", [])
-    total_rows = st.session_state.get("product_prc_total", len(data))
+    data = st.session_state.get("product_group_data", [])
+    total_rows = st.session_state.get("product_group_total", len(data))
 
     if not data:
-        st.info("Tidak ada data product prc yang ditemukan.")
+        st.info("Tidak ada data product group yang ditemukan.")
         return
 
-    st.markdown(f"**Total Data product prc: {total_rows}**")
+    st.markdown(f"**Total Data product group: {total_rows}**")
 
     # Buat DataFrame lengkap
     df_page = pd.DataFrame(data).reset_index(drop=True)
@@ -115,8 +115,8 @@ def app():
     df_page["No"] = df_page["No"].astype(str)
 
     ordered_cols = [
-        "No", "prlin", "prlinname", "pcode", "pcodename", "unit1", "unit2", "unit3",
-        "convunit2","convunit3","createdate", "createby", "updatedate", "updateby"
+        "No", "brand", "prlinname", "pcode", "pcodename", "product_group_1", "product_group_2", "product_group_3",
+        "category_item","vtkp","npd", "createdate", "createby", "updatedate", "updateby"
     ]
     df_page = df_page[[col for col in ordered_cols if col in df_page.columns]]
 
@@ -124,13 +124,13 @@ def app():
     st.download_button(
         label="⬇️ Download CSV (Semua Data)",
         data=csv,
-        file_name="product_prc_data_all.csv",
+        file_name="product_group_data_all.csv",
         mime="text/csv"
     )
 
 # Tampilkan grid
     updated_df, selected_rows = render_grid(df_page)
-    full_data = st.session_state["product_prc_data"]
+    full_data = st.session_state["product_group_data"]
     original_map = {str(r["pcode"]): r for r in full_data}
 
     # Tombol Simpan Perubahan 
@@ -143,12 +143,12 @@ def app():
                 orig = original_map[sid]
 
                 is_changed = (
-                    (row.get("pcodename") or "") != (orig.get("pcodename") or "") or
-                    (row.get("unit1") or "") != (orig.get("unit1") or "") or
-                    (row.get("unit2") or "") != (orig.get("unit2") or "") or
-                    (row.get("unit3") or "") != (orig.get("unit3") or "") or
-                    (row.get("convunit2") or "") != (orig.get("convunit2") or "") or
-                    str(row.get("convunit3") or "") != str(orig.get("convunit3") or "")
+                    (row.get("product_group_1") or "") != (orig.get("product_group_1") or "") or
+                    (row.get("product_group_2") or "") != (orig.get("product_group_2") or "") or
+                    (row.get("product_group_3") or "") != (orig.get("product_group_3") or "") or
+                    (row.get("category_item") or "") != (orig.get("category_item") or "") or
+                    (row.get("vtkp") or "") != (orig.get("vtkp") or "") or
+                    str(row.get("npd") or "") != str(orig.get("npd") or "")
                 )
 
                 if not is_changed:
@@ -157,14 +157,12 @@ def app():
 
                 changed_rows.append({
                     "pcode": sid,
-                    "pcodename": row.get("pcodename") or "",
-                    "unit1": row.get("unit1") or "",
-                    "unit2": row.get("unit2") or "",
-                    "unit3": row.get("unit3") or "",
-                    "convunit2": row.get("convunit2") or "",
-                    "convunit3": row.get("convunit3") or "",
-                    "prlin": row.get("prlin") or "",
-                    "prlinname": row.get("prlinname") or "",
+                    "product_group_1": row.get("product_group_1") or "",
+                    "product_group_2": row.get("product_group_2") or "",
+                    "product_group_3": row.get("product_group_3") or "",
+                    "category_item": row.get("category_item") or "",
+                    "vtkp": row.get("vtkp") or "",
+                    "npd": row.get("npd") or "",
                     "updateby": updateby
                 })
 
@@ -175,17 +173,15 @@ def app():
                 fail_list = []
                 with st.spinner(f"Menyimpan {len(changed_rows)} perubahan..."):
                     for r in changed_rows:
-                        res = update_product_prc(
+                        res = update_product_group(
                             token,
                             r["pcode"],
-                            r["pcodename"],
-                            r["unit1"],
-                            r["unit2"],
-                            r["unit3"],
-                            r["convunit2"],
-                            r["convunit3"],
-                            r["prlin"],
-                            r["prlinname"],
+                            r["product_group_1"],
+                            r["product_group_2"],
+                            r["product_group_3"],
+                            r["category_item"],
+                            r["vtkp"],
+                            r["npd"],
                             r["updateby"]
                         )
                         if res and res.status_code == 200:
@@ -195,11 +191,10 @@ def app():
 
                 if success > 0:
                     st.success(f"{success} perubahan berhasil disimpan.")
-                    st.session_state["refresh_product_prc"] = True
+                    st.session_state["refresh_product_group"] = True
                     st.rerun()
                 if fail_list:
                     st.error(f"Gagal menyimpan untuk pcode: {', '.join(fail_list)}")
-
 
     #Tombol Hapus Baris Terpilih
     if st.button("🗑️ Hapus Data Terpilih"):
@@ -207,10 +202,10 @@ def app():
             st.warning("Pilih minimal 1 baris yang ingin dihapus dengan centang checkbox.")
         else:
             ids_to_delete = selected_rows["pcode"].tolist()
-            res = delete_product_prc(token, ids_to_delete)
+            res = delete_product_group(token, ids_to_delete)
             if res and res.status_code == 200:
                 st.success(f"{len(ids_to_delete)} baris berhasil dihapus!")
-                st.session_state["refresh_product_prc"] = True
+                st.session_state["refresh_product_group"] = True
                 st.rerun()
             else:
                 try:
@@ -218,21 +213,3 @@ def app():
                 except Exception:
                     err = "Gagal menghapus data."
                 st.error(err)
-
-    # Tombol Segarkan
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col1:
-        if st.button("🔄 Segarkan Data"):
-            st.session_state["refresh_product_prc"] = True
-            st.rerun()
-    with col2:
-        st.markdown(
-            f"### Menampilkan {len(st.session_state['product_prc_data'])} / {total_rows} baris",
-            unsafe_allow_html=True
-        )
-    with col3:
-        pass
-
-# Jalankan langsung (opsional)
-if __name__ == "__main__":
-    app()

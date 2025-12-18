@@ -182,6 +182,12 @@ else:
                 if st.button("Product PRC", key="prod2", use_container_width=True):
                     st.session_state.page = "product_prc"; st.rerun()
 
+                if st.button("Product Group", key="prod3", use_container_width=True):
+                    st.session_state.page = "product_group"; st.rerun()
+
+                if st.button("Mapping Product", key="prod4", use_container_width=True):
+                    st.session_state.page = "mapping_product"
+
 
             # USER CARD + LOGOUT
             st.markdown(f"""
@@ -328,4 +334,22 @@ else:
     elif st.session_state.page == "upload_product_prc":
         from pages.product.product_prc import upload_product_prc
         upload_product_prc.app()
+
+    # PRODUCT GROUP
+    elif st.session_state.page == "product_group":
+        from pages.product.product_group import product_group_page
+        product_group_page.app()
+
+    elif st.session_state.page == "upload_product_group":
+        from pages.product.product_group import upload_product_group
+        upload_product_group.app()
+
+    # MAPPING PRODUCT
+    elif st.session_state.page == "mapping_product":
+        from pages.product.mapping_product import mapping_product_page
+        mapping_product_page.app()
+
+    elif st.session_state.page == "upload_mapping_product":
+        from pages.product.mapping_product import upload_mapping_product
+        upload_mapping_product.app()
 

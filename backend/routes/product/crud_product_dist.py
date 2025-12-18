@@ -79,7 +79,7 @@ def get_customer_prc():
         conn.close()
         release_db_connection(conn)
 
-#INSERT DATA CUSTOMER DIST
+#INSERT DATA PRODUCT
 @product_dist_bp.route('/insert', methods=['POST'])
 @token_required
 def insert_customer_dist():
