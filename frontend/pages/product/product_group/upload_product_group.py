@@ -116,9 +116,10 @@ def app():
         # Tombol kembali
         st.markdown("---")
         if st.button("⬅️ Kembali ke Data Product Group"):
-            st.cache_data.clear()
-            st.session_state["refresh_product_group"] = True
+
+            st.session_state["refresh_product_group"] = False
             st.session_state.page = "product_group"
+
             st.session_state.upload_done = False
             st.session_state.upload_result = None
             st.rerun()

@@ -3,25 +3,18 @@ import pandas as pd
 from utils.api.product.product_prc_api import get_product_prc, update_product_prc, delete_product_prc
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
-PAGE_CHUNK = 100  
+PAGE_CHUNK = 200  # jumlah data yang diambil sekali dari API
 
-# Fetch semua data product prc
-def fetch_all_product_prc(token):
+# Fungsi untuk fetch data dari API sekali saja
+def fetch_product_prc_data(token):
     all_data = []
     offset = 0
     limit = PAGE_CHUNK
 
     while True:
         res = get_product_prc(token, offset=offset, limit=limit)
-        if not res:
-            break
-        if res.status_code != 200:
-            try:
-                err = res.json().get("error") or res.json().get("message") or "Gagal memuat data product prc."
-            except Exception:
-                err = "Gagal memuat data product prc."
-            st.error(err)
-            break
+        if not res or res.status_code != 200:
+            return None
 
         payload = res.json()
         data_chunk = payload.get("data", [])
@@ -31,27 +24,19 @@ def fetch_all_product_prc(token):
         offset += len(data_chunk)
         if not data_chunk or offset >= total:
             break
+    return all_data
 
-    return all_data, len(all_data)
-
-
-# Render grid dengan checkbox
+# Fungsi render AgGrid
 def render_grid(df):
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_column("No", header_name="No", width=60, pinned="left", editable=False)
     gb.configure_column("prlin", header_name="KODE PRLIN", editable=False)
     gb.configure_column("prlinname", header_name="NAMA PRLIN NAME", editable=False)
     gb.configure_column("pcode", header_name="PCODE", width=150, editable=False)
-    gb.configure_column("pcodename", header_name="PCODENAME", width=250, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("unit1", header_name="UNIT 1", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("unit2", header_name="UNIT 2", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("unit3", header_name="UNIT 3", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("convunit2", header_name="KONVERSI UNIT 2", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("convunit3", header_name="KONVERSI UNIT 3", editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
-    gb.configure_column("createdate", header_name="Created Date", editable=False)
-    gb.configure_column("createby", header_name="Create By", editable=False)
-    gb.configure_column("updatedate", header_name="Update Date", editable=False)
-    gb.configure_column("updateby", header_name="Update By", editable=False)
+    editable_cols = ["pcodename", "unit1", "unit2", "unit3", "convunit2", "convunit3"]
+    for col in editable_cols:
+        if col in df.columns:
+            gb.configure_column(col, editable=True, cellStyle={"backgroundColor": "#E2EAF4"})
     gb.configure_default_column(filter=True, sortable=True, resizable=True)
     gb.configure_selection(selection_mode="multiple", use_checkbox=True)
     gb.configure_grid_options(enableRangeSelection=True, suppressRowClickSelection=False)
@@ -75,41 +60,34 @@ def render_grid(df):
     selected_rows = pd.DataFrame(grid_response['selected_rows']).drop(columns=["No"], errors='ignore')
     return updated_df, selected_rows
 
-# Halaman Region Page
+# Halaman Product PRC
 def app():
+    # --- Validasi login ---
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠️ Anda harus login terlebih dahulu.")
         st.session_state.page = "main"
         return
 
     st.title("🍘 PRODUCT PRC")
-
     token = st.session_state.token
     updateby = st.session_state.user['nama']
 
-    if st.button("⬆️ Upload product prc"):
-        st.session_state.page = "upload_product_prc"
-        st.rerun()
-        return
-
-    # Refresh data hanya jika belum ada atau flag refresh aktif
+    # --- Load data pertama kali jika belum ada ---
     if "product_prc_data" not in st.session_state or st.session_state.get("refresh_product_prc", True):
-        with st.spinner("Memuat semua data product prc..."):
-            all_data, total_count = fetch_all_product_prc(token)
-            st.session_state["product_prc_data"] = all_data
-            st.session_state["product_prc_total"] = total_count
+        with st.spinner("Memuat data product PRC..."):
+            data = fetch_product_prc_data(token)
+            if data is None:
+                st.error("Gagal memuat data product PRC. Silahkan coba refresh halaman.")
+                return
+            st.session_state["product_prc_data"] = data
             st.session_state["refresh_product_prc"] = False
 
-    data = st.session_state.get("product_prc_data", [])
-    total_rows = st.session_state.get("product_prc_total", len(data))
-
+    data = st.session_state["product_prc_data"]
     if not data:
-        st.info("Tidak ada data product prc yang ditemukan.")
+        st.info("Data belum tersedia.")
         return
 
-    st.markdown(f"**Total Data product prc: {total_rows}**")
-
-    # Buat DataFrame lengkap
+    # --- Buat DataFrame ---
     df_page = pd.DataFrame(data).reset_index(drop=True)
     df_page.insert(0, "No", range(1, len(df_page) + 1))
     df_page["No"] = df_page["No"].astype(str)
@@ -120,6 +98,9 @@ def app():
     ]
     df_page = df_page[[col for col in ordered_cols if col in df_page.columns]]
 
+    st.markdown(f"**Total Data product PRC: {len(df_page)}**")
+
+    # --- Download CSV semua data ---
     csv = df_page.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="⬇️ Download CSV (Semua Data)",
@@ -128,33 +109,23 @@ def app():
         mime="text/csv"
     )
 
-# Tampilkan grid
+    # --- Render grid ---
     updated_df, selected_rows = render_grid(df_page)
-    full_data = st.session_state["product_prc_data"]
-    original_map = {str(r["pcode"]): r for r in full_data}
+    original_map = {str(r["pcode"]): r for r in data}
 
-    # Tombol Simpan Perubahan 
+    # --- Tombol Simpan Perubahan ---
     if st.button("💾 Simpan Perubahan"):
-            changed_rows = []
-            for _, row in updated_df.iterrows():
-                sid = str(row.get("pcode"))
-                if sid not in original_map:
-                    continue
-                orig = original_map[sid]
-
-                is_changed = (
-                    (row.get("pcodename") or "") != (orig.get("pcodename") or "") or
-                    (row.get("unit1") or "") != (orig.get("unit1") or "") or
-                    (row.get("unit2") or "") != (orig.get("unit2") or "") or
-                    (row.get("unit3") or "") != (orig.get("unit3") or "") or
-                    (row.get("convunit2") or "") != (orig.get("convunit2") or "") or
-                    str(row.get("convunit3") or "") != str(orig.get("convunit3") or "")
-                )
-
-                if not is_changed:
-                    continue
-
-
+        changed_rows = []
+        for _, row in updated_df.iterrows():
+            sid = str(row.get("pcode"))
+            orig = original_map.get(sid)
+            if not orig:
+                continue
+            is_changed = any(
+                str(row.get(c) or "") != str(orig.get(c) or "")
+                for c in ["pcodename", "unit1", "unit2", "unit3", "convunit2", "convunit3"]
+            )
+            if is_changed:
                 changed_rows.append({
                     "pcode": sid,
                     "pcodename": row.get("pcodename") or "",
@@ -168,40 +139,40 @@ def app():
                     "updateby": updateby
                 })
 
-            if not changed_rows:
-                st.info("Tidak ada perubahan yang disimpan.")
-            else:
-                success = 0
-                fail_list = []
-                with st.spinner(f"Menyimpan {len(changed_rows)} perubahan..."):
-                    for r in changed_rows:
-                        res = update_product_prc(
-                            token,
-                            r["pcode"],
-                            r["pcodename"],
-                            r["unit1"],
-                            r["unit2"],
-                            r["unit3"],
-                            r["convunit2"],
-                            r["convunit3"],
-                            r["prlin"],
-                            r["prlinname"],
-                            r["updateby"]
-                        )
-                        if res and res.status_code == 200:
-                            success += 1
-                        else:
-                            fail_list.append(r["pcode"])
+        if not changed_rows:
+            st.info("Tidak ada perubahan yang disimpan.")
+        else:
+            success = 0
+            fail_list = []
+            for r in changed_rows:
+                res = update_product_prc(
+                    token,
+                    r["pcode"],
+                    r["pcodename"],
+                    r["unit1"],
+                    r["unit2"],
+                    r["unit3"],
+                    r["convunit2"],
+                    r["convunit3"],
+                    r["prlin"],
+                    r["prlinname"],
+                    r["updateby"]
+                )
+                if res and res.status_code == 200:
+                    # update langsung di session state
+                    for i, item in enumerate(st.session_state["product_prc_data"]):
+                        if item["pcode"] == r["pcode"]:
+                            st.session_state["product_prc_data"][i].update(r)
+                    success += 1
+                else:
+                    fail_list.append(r["pcode"])
 
-                if success > 0:
-                    st.success(f"{success} perubahan berhasil disimpan.")
-                    st.session_state["refresh_product_prc"] = True
-                    st.rerun()
-                if fail_list:
-                    st.error(f"Gagal menyimpan untuk pcode: {', '.join(fail_list)}")
+            if success > 0:
+                st.success(f"{success} perubahan berhasil disimpan.")
+            if fail_list:
+                st.error(f"Gagal menyimpan untuk pcode: {', '.join(fail_list)}")
 
-
-    #Tombol Hapus Baris Terpilih
+    # --- Tombol Hapus Data Terpilih ---
     if st.button("🗑️ Hapus Data Terpilih"):
         if selected_rows.empty:
             st.warning("Pilih minimal 1 baris yang ingin dihapus dengan centang checkbox.")
@@ -209,9 +180,11 @@ def app():
             ids_to_delete = selected_rows["pcode"].tolist()
             res = delete_product_prc(token, ids_to_delete)
             if res and res.status_code == 200:
+                # hapus langsung dari session state
+                st.session_state["product_prc_data"] = [
+                    r for r in st.session_state["product_prc_data"] if r["pcode"] not in ids_to_delete
+                ]
                 st.success(f"{len(ids_to_delete)} baris berhasil dihapus!")
-                st.session_state["refresh_product_prc"] = True
-                st.rerun()
             else:
                 try:
                     err = res.json().get("error") or res.json().get("message") or "Gagal menghapus data."
@@ -219,20 +192,17 @@ def app():
                     err = "Gagal menghapus data."
                 st.error(err)
 
-    # Tombol Segarkan
+    # --- Tombol Segarkan Data (API ulang jika diperlukan) ---
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
         if st.button("🔄 Segarkan Data"):
             st.session_state["refresh_product_prc"] = True
-            st.rerun()
+            st.experimental_rerun()
     with col2:
-        st.markdown(
-            f"### Menampilkan {len(st.session_state['product_prc_data'])} / {total_rows} baris",
-            unsafe_allow_html=True
-        )
+        st.markdown(f"### Menampilkan {len(st.session_state['product_prc_data'])} baris", unsafe_allow_html=True)
     with col3:
         pass
 
-# Jalankan langsung (opsional)
+# Jalankan langsung
 if __name__ == "__main__":
     app()
