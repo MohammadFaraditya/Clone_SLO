@@ -188,6 +188,9 @@ else:
                 if st.button("Mapping Product", key="prod4", use_container_width=True):
                     st.session_state.page = "mapping_product"
 
+                if st.button("Price Group", key="prod5", use_container_width=True):
+                    st.session_state.page = "pricegroup"
+
 
             # USER CARD + LOGOUT
             st.markdown(f"""
@@ -352,4 +355,13 @@ else:
     elif st.session_state.page == "upload_mapping_product":
         from pages.product.mapping_product import upload_mapping_product
         upload_mapping_product.app()
+
+    # PRICEGROUP
+    elif st.session_state.page == "pricegroup":
+        from pages.product.pricegroup import pricegroup_page
+        pricegroup_page.app()
+
+    elif st.session_state.page == "upload_pricegroup":
+        from pages.product.pricegroup import upload_price_group
+        upload_price_group.app()
 

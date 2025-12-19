@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
-from utils.api.area.entity_api import insert_entity
+from utils.api.product.pricegroup_api import insert_pricegroup
 
 # Template XLSX
 def generate_template():
-    df = pd.DataFrame(columns=["id_entity", "keterangan", "koderegion"])
+    df = pd.DataFrame(columns=["pricecode", "pricename", "pcode", "sellprice1", "sellprice2", "sellprice3"])
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template")
@@ -22,9 +22,9 @@ def process_upload(file, username):
         return None
 
     # Validasi kolom
-    required_cols = ["id_entity", "keterangan", "koderegion"]
+    required_cols = ["pricecode", "pricename", "pcode", "sellprice1", "sellprice2", "sellprice3"]
     if not all(col in df.columns for col in required_cols):
-        st.error("Kolom harus sesuai template: entity, keterangan, koderegion")
+        st.error("Kolom harus sesuai template")
         return None
 
     # Tambahkan metadata
@@ -32,7 +32,7 @@ def process_upload(file, username):
     df["createdate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Kirim ke API
-    res = insert_entity(df)
+    res = insert_pricegroup(df)
     if not res:
         st.error("Gagal terhubung ke server.")
         return None
@@ -66,22 +66,22 @@ def app():
 
     username = st.session_state.user["nama"]
 
-    st.title("⬆️ Upload Entity")
+    st.title("⬆️ Upload PriceGroup")
 
     # Bagian Download Template 
-    st.subheader("📄 Download Template Entity")
+    st.subheader("📄 Download Template PriceGroup")
     template_file = generate_template()
     st.download_button(
         label="Download Template XLSX",
         data=template_file,
-        file_name="template_entity.xlsx",
+        file_name="template_PriceGroup.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
     # Jika belum upload 
     if not st.session_state.upload_done:
-        st.subheader("📤 Upload Data Entity")
-        uploaded_file = st.file_uploader("Pilih file Excel (Template Entity)", type=["xlsx"])
+        st.subheader("📤 Upload Data PriceGroup")
+        uploaded_file = st.file_uploader("Pilih file Excel (Template PriceGroup)", type=["xlsx"])
 
         if uploaded_file and st.button("🚀 Upload Data"):
             with st.spinner("Sedang memproses data..."):
@@ -96,8 +96,8 @@ def app():
     else:
         result_json = st.session_state.upload_result
         message = result_json.get("message", "")
-        duplicate_entities = result_json.get("duplicate_ids", [])
-        invalid_regions = result_json.get("invalid_koderegion", [])
+        duplicate_entities = result_json.get("skipped_duplicate", [])
+        invalid_pcode = result_json.get("skipped_invalid_pcode", [])
 
         st.success("✅ Upload selesai. Berikut hasil proses:")
         if message:
@@ -108,17 +108,17 @@ def app():
         # Duplicate
         for i in duplicate_entities:
             rows.append({
-                "id_entity": i,
-                "koderegion": "",
+                "PriceCode": i,
+                "Pcode": "",
                 "Status": "Duplicate (Skipped)"
             })
 
         # Invalid region
-        for r in invalid_regions:
+        for r in invalid_pcode:
             rows.append({
-                "id_entity": "",
-                "koderegion": r,
-                "Status": "Invalid Region (Skipped)"
+                "PriceCode": "",
+                "Pcode": r,
+                "Status": "Invalid Pcode PRC (Skipped)"
             })
 
         if rows:
@@ -131,10 +131,10 @@ def app():
 
           # Tombol kembali
         st.markdown("---")
-        if st.button("⬅️ Kembali ke Data Entity"):
+        if st.button("⬅️ Kembali ke Data PriceGroup"):
             st.cache_data.clear()
-            st.session_state["refresh_entity"] = True
-            st.session_state.page = "entity"
+            st.session_state["refresh_pricegroup"] = True
+            st.session_state.page = "pricegroup"
             st.session_state.upload_done = False
             st.session_state.upload_result = None
             st.rerun()

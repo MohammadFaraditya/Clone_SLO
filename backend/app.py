@@ -18,6 +18,7 @@ from routes.product.crud_product_dist import product_dist_bp
 from routes.product.crud_product_prc import product_prc_bp
 from routes.product.crud_product_group import product_group_bp
 from routes.product.crd_mapping_product import mapping_product_bp
+from routes.product.crud_pricegroup import pricegroup_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -40,6 +41,7 @@ app.register_blueprint(product_dist_bp)
 app.register_blueprint(product_prc_bp)
 app.register_blueprint(product_group_bp)
 app.register_blueprint(mapping_product_bp)
+app.register_blueprint(pricegroup_bp)
 
 
 if __name__ == '__main__':
