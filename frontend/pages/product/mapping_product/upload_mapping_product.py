@@ -111,9 +111,9 @@ def app():
         for i in duplicate_entities:
             rows.append({"pcode_prc": normalize_value(i), "pcode_dist": "", "Status": "Duplicated (Skipped)"})
         for r in skipped_invalid_prc:
-            rows.append({"pcode_prc": normalize_value(r), "pcode_dist": "", "Status": "Customer PRC belum terdaftar (Skipped)"})
+            rows.append({"pcode_prc": normalize_value(r), "pcode_dist": "", "Status": " Product PRC belum terdaftar (Skipped)"})
         for t in skipped_invalid_dist:
-            rows.append({"pcode_prc": "", "pcode_dist": normalize_value(t), "Status": "Customer DIST belum terdaftar (Skipped)"})
+            rows.append({"pcode_prc": "", "pcode_dist": normalize_value(t), "Status": " Product DIST belum terdaftar (Skipped)"})
 
         if rows:
             df_display = pd.DataFrame(rows)
