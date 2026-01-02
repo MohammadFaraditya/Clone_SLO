@@ -1,4 +1,3 @@
-# customer_prc_page.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -10,8 +9,7 @@ from utils.api.customer.customer_prc_api import (
     get_region_entity_branch_mapping,
     get_customer_prc,
     update_customer_prc,
-    delete_customer_prc,
-    insert_customer_prc
+    delete_customer_prc
 )
 
 PAGE_CHUNK = 100 
@@ -19,10 +17,6 @@ PAGE_CHUNK = 100
 # CACHE: ambil seluruh data (chunked) sekali
 @cache_data(ttl=600) 
 def fetch_all_customer_prc_cached(token, kodebranch, chunk_limit=2000):
-    """
-    Ambil seluruh data menggunakan pagination API secara chunk (besar).
-    Hanya dipanggil sekali per (token,kodebranch) selama ttl.
-    """
     all_data = []
     offset = 0
     limit = chunk_limit

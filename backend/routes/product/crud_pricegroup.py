@@ -22,7 +22,7 @@ def token_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# GET DATA ENTITY
+# GET DATA PRICEGROUP
 @pricegroup_bp.route('/data', methods=['GET'])
 @token_required
 def get_pricegroup():
@@ -284,7 +284,7 @@ def delete_pricegroup():
                 "DELETE FROM pricegroup WHERE pricecode=%s AND pcode=%s",
                 (pricecode, pcode)
             )
-            deleted_count += cur.rowcount  # rowcount memberi jumlah baris yg dihapus
+            deleted_count += cur.rowcount 
 
         conn.commit()
     except Exception as e:

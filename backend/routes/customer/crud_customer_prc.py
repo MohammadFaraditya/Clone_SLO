@@ -77,7 +77,6 @@ def get_customer_prc():
     
     finally:
         cursor.close()
-        conn.close()
         release_db_connection(conn)
 
 #INSERT DATA CUSTOMER PRC

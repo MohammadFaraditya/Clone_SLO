@@ -18,6 +18,10 @@ if "collapse_customer" not in st.session_state:
     st.session_state.collapse_customer = False
 if "collapse_product" not in st.session_state:
     st.session_state.collapse_product = False    
+if "collapse_config" not in st.session_state:
+    st.session_state.collapse_config = False   
+if "collapse_sellout" not in st.session_state:
+    st.session_state.collapse_sellout = False 
 
 # SIDEBAR CSS FIX
 st.markdown("""
@@ -190,7 +194,24 @@ else:
 
                 if st.button("Price Group", key="prod5", use_container_width=True):
                     st.session_state.page = "pricegroup"
+            
+            st.markdown("---")
 
+            # CONFIG
+            if st.button("▶️ Config", key="config_menu", use_container_width=True):
+                st.session_state.collapse_config = not st.session_state.collapse_config
+
+            if st.session_state.get("collapse_config", False):
+                if st.button("Config Invoice", key="conf1", use_container_width=True):
+                    st.session_state.page = "config"; st.rerun()
+
+            # SELLOUT
+            if st.button("▶️ Sellout", key="sellout_menu", use_container_width=True):
+                st.session_state.collapse_sellout = not st.session_state.collapse_sellout
+
+            if st.session_state.get("collapse_sellout", False):
+                if st.button("sellout", key="sellout1", use_container_width=True):
+                    st.session_state.page = "sellout"; st.rerun()
 
             # USER CARD + LOGOUT
             st.markdown(f"""
@@ -364,4 +385,22 @@ else:
     elif st.session_state.page == "upload_pricegroup":
         from pages.product.pricegroup import upload_price_group
         upload_price_group.app()
+
+    # CONFIG
+    elif st.session_state.page == "config":
+        from pages.config import config_page
+        config_page.app()
+
+    elif st.session_state.page == "upload_config":
+        from pages.config import upload_config
+        upload_config.app()
+
+    # SELLOUT
+    elif st.session_state.page == "sellout":
+        from pages.sellout import sellout_page
+        sellout_page.app()
+
+    elif st.session_state.page == "upload_sellout":
+        from pages.sellout import upload_sellout
+        upload_sellout.app()
 
