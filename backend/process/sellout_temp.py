@@ -10,20 +10,12 @@ def load_file(file, config):
         return pd.read_excel(file, header=None, skiprows=start_row)
 
     if config['file_extension'] == 'csv':
-        return pd.read_csv(
-            file,
-            header=None,
-            skiprows=start_row,
-            sep=config.get('separator_file') or ','
-        )
+        return pd.read_csv(file, header=None, skiprows=start_row,
+                           sep=config.get('separator_file') or ',')
 
     if config['file_extension'] == 'txt':
-        return pd.read_csv(
-            file,
-            header=None,
-            skiprows=start_row,
-            sep=config.get('separator_file') or '|'
-        )
+        return pd.read_csv(file, header=None, skiprows=start_row,
+                           sep=config.get('separator_file') or '|')
 
     raise Exception("Format file tidak didukung")
 
@@ -33,14 +25,12 @@ def get_val(row, idx):
         return None
     try:
         val = row[idx - 1]
-        if pd.isna(val):
-            return None
-        return val
+        return None if pd.isna(val) else val
     except Exception:
         return None
 
 
-def process_sellout(df, config, username):
+def process_sellout(df, config, username, upload_batch_id):
     now = datetime.now()
     data = []
 
@@ -69,6 +59,7 @@ def process_sellout(df, config, username):
             qty3 = 0
 
         data.append({
+            "upload_batch_id": upload_batch_id,
             "kodebranch": str(get_val(row, config['kodebranch'])),
             "id_salesman": str(get_val(row, config['id_salesman'])),
             "id_customer": str(get_val(row, config['id_customer'])),
@@ -102,7 +93,7 @@ def process_sellout(df, config, username):
             "invoice_type": get_val(row, config.get('invoice_type')),
 
             "flag_bonus": flag_bonus,
-            "flag_move" : "N",
+            "flag_move": "N",
             "createdate": now,
             "createby": username
         })
@@ -110,7 +101,6 @@ def process_sellout(df, config, username):
     return data
 
 
-# ================= NEW (DITAMBAHKAN SAJA) =================
 def get_date_range(rows):
     dates = [r['invoice_date'] for r in rows if r.get('invoice_date')]
     if not dates:
@@ -122,11 +112,10 @@ def delete_sellout_by_range(conn, branch, start_date, end_date):
     cur = conn.cursor()
     cur.execute("""
         DELETE FROM sellout_temp
-        WHERE kodebranch = %s
-        AND invoice_date BETWEEN %s AND %s
+        WHERE kodebranch=%s
+          AND invoice_date BETWEEN %s AND %s
     """, (branch, start_date, end_date))
     cur.close()
-# ========================================================
 
 
 def insert_sellout(conn, rows):

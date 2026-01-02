@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-import jwt, os
+import jwt, os, uuid
 import pandas as pd
 from functools import wraps
 from db import get_db_connection, release_db_connection
@@ -50,7 +50,9 @@ def get_branch_config(branch_code, conn):
     return config
 
 
-# ================= GET DATA SELLOUT 
+# =====================================================
+# ================= GET DATA SELLOUT ==================
+# =====================================================
 @sellout_bp.route('/data', methods=['GET'])
 @token_required
 def get_sellout():
@@ -65,13 +67,11 @@ def get_sellout():
         limit = 50
 
     kodebranch = request.args.get('kodebranch')
-    date_from = request.args.get('date_from')  # YYYY-MM-DD
-    date_to = request.args.get('date_to')      # YYYY-MM-DD
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
 
-    # ================= VALIDATION =================
     if not kodebranch:
         return jsonify({"error": "kodebranch wajib diisi"}), 400
-
     if not date_from or not date_to:
         return jsonify({"error": "date_from dan date_to wajib diisi"}), 400
 
@@ -80,25 +80,28 @@ def get_sellout():
 
     try:
         cursor.execute("""
-            SELECT region_code, region_name, entity_code, entity_name,
-                   branch_code, branch_name, area_code, area_name,
-                   salesman_code, salesman_name,
-                   custcode_prc, custcode_dist, custname, custaddress,
-                   custcity, sub_channel, type_outlet,
-                   order_no, order_date,
-                   invoice_no, invoice_type, invoice_date,
-                   product_brand, product_group1, product_group2, product_group3,
-                   pcode, pcode_name,
-                   qty1, qty2, qty3, qty4, qty5,
-                   flag_bonus,
-                   grossamount,
-                   discount1, discount2, discount3, discount4,
-                   discount5, discount6, discount7, discount8,
-                   total_discount, dpp, tax, nett,
-                   category, vtkp, npd,
-                   createdate, createby, updatedate, updateby
+            SELECT
+                region_code, region_name,
+                entity_code, entity_name,
+                branch_code, branch_name,
+                area_code, area_name,
+                salesman_code, salesman_name,
+                custcode_prc, custcode_dist, custname, custaddress,
+                custcity, sub_channel, type_outlet,
+                order_no, order_date,
+                invoice_no, invoice_type, invoice_date,
+                product_brand, product_group1, product_group2, product_group3,
+                pcode, pcode_name,
+                qty1, qty2, qty3, qty4, qty5,
+                flag_bonus,
+                grossamount,
+                discount1, discount2, discount3, discount4,
+                discount5, discount6, discount7, discount8,
+                total_discount, dpp, tax, nett,
+                category, vtkp, npd,
+                createdate, createby, updatedate, updateby
             FROM sellout
-            WHERE branch_code = %s
+            WHERE branch_code=%s
               AND invoice_date BETWEEN %s AND %s
             ORDER BY invoice_date
             LIMIT %s OFFSET %s
@@ -106,22 +109,20 @@ def get_sellout():
 
         data = cursor.fetchall()
 
-        # ================= COUNT QUERY =================
         cursor.execute("""
             SELECT COUNT(1) AS total
             FROM sellout
-            WHERE branch_code = %s
+            WHERE branch_code=%s
               AND invoice_date BETWEEN %s AND %s
         """, (kodebranch, date_from, date_to))
 
-        total_row = cursor.fetchone()
-        total_count = total_row["total"] if total_row else 0
+        total = cursor.fetchone()["total"]
 
         return jsonify({
             "data": data,
             "offset": offset,
             "limit": limit,
-            "total": total_count
+            "total": total
         }), 200
 
     finally:
@@ -129,7 +130,9 @@ def get_sellout():
         release_db_connection(conn)
 
 
-# ================= UPLOAD SELLOUT (SUDAH ANTI DUPLIKAT) =================
+# =====================================================
+# ================= UPLOAD SELLOUT ====================
+# =====================================================
 @sellout_bp.route('/upload', methods=['POST'])
 @token_required
 def upload_sellout():
@@ -154,26 +157,41 @@ def upload_sellout():
         if ext != config['file_extension']:
             return jsonify({"error": "Format file tidak sesuai config"}), 400
 
+        # ===== GENERATE BATCH ID =====
+        upload_batch_id = str(uuid.uuid4())
+
         df = load_file(file, config)
-        rows = process_sellout(df, config, username)
+        rows = process_sellout(df, config, username, upload_batch_id)
 
         if not rows:
             return jsonify({"error": "Tidak ada data valid"}), 400
 
-        # ===== NEW LOGIC (TANPA UBAH YANG LAIN) =====
         start_date, end_date = get_date_range(rows)
         if not start_date or not end_date:
             return jsonify({"error": "Invoice date tidak ditemukan"}), 400
 
         delete_sellout_by_range(conn, branch, start_date, end_date)
-        # ===========================================
 
         insert_sellout(conn, rows)
         conn.commit()
 
+        # ===== INSERT QUEUE =====
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO sellout_process_queue (
+                upload_batch_id,
+                status,
+                created_at
+            )
+            VALUES (%s, 'PENDING', NOW())
+        """, (upload_batch_id,))
+        conn.commit()
+        cur.close()
+
         return jsonify({
             "message": "Upload sellout berhasil",
-            "total_row": len(rows)
+            "total_row": len(rows),
+            "upload_batch_id": upload_batch_id
         })
 
     except Exception as e:

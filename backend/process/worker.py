@@ -11,17 +11,15 @@ def sellout_worker():
             cur.execute("""
                 SELECT id, upload_batch_id
                 FROM sellout_process_queue
-                WHERE status IN ('PENDING','PROCESSING')
-                AND (started_at IS NULL OR started_at < NOW() - INTERVAL '10 minutes')
+                WHERE status = 'PENDING'
                 ORDER BY created_at
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             """)
-            job = cur.fetchone()
 
+            job = cur.fetchone()
             if not job:
-                cur.close()
-                release_db_connection(conn)
+                conn.commit()
                 time.sleep(2)
                 continue
 
@@ -29,8 +27,9 @@ def sellout_worker():
 
             cur.execute("""
                 UPDATE sellout_process_queue
-                SET status='PROCESSING', started_at=NOW()
-                WHERE id=%s
+                SET status = 'PROCESSING',
+                    started_at = NOW()
+                WHERE id = %s
             """, (job_id,))
             conn.commit()
 
@@ -38,8 +37,9 @@ def sellout_worker():
 
             cur.execute("""
                 UPDATE sellout_process_queue
-                SET status='DONE', finished_at=NOW()
-                WHERE id=%s
+                SET status = 'DONE',
+                    finished_at = NOW()
+                WHERE id = %s
             """, (job_id,))
             conn.commit()
 
@@ -47,10 +47,11 @@ def sellout_worker():
             conn.rollback()
             cur.execute("""
                 UPDATE sellout_process_queue
-                SET status='FAILED'
-                WHERE id=%s
+                SET status = 'FAILED'
+                WHERE id = %s
             """, (job_id,))
             conn.commit()
+            print("❌ Worker error:", e)
 
         finally:
             cur.close()
