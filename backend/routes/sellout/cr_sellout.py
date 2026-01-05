@@ -9,14 +9,14 @@ from process.sellout_temp import (
     load_file,
     process_sellout,
     insert_sellout,
-    get_date_range,
-    delete_sellout_by_range
+    delete_sellout_final_by_month,
+    delete_sellout_temp_old_months
 )
 
 sellout_bp = Blueprint('sellout', __name__, url_prefix='/sellout')
 SECRET_KEY = os.getenv('SECRET_KEY', "dev_secret")
 
-# ================= TOKEN =================
+# TOKEN 
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -31,7 +31,7 @@ def token_required(f):
     return decorated
 
 
-# ================= CONFIG =================
+# CONFIG
 def get_branch_config(branch_code, conn):
     cur = conn.cursor()
     cur.execute("""
@@ -50,9 +50,7 @@ def get_branch_config(branch_code, conn):
     return config
 
 
-# =====================================================
-# ================= GET DATA SELLOUT ==================
-# =====================================================
+#  GET DATA SELLOUT 
 @sellout_bp.route('/data', methods=['GET'])
 @token_required
 def get_sellout():
@@ -130,9 +128,7 @@ def get_sellout():
         release_db_connection(conn)
 
 
-# =====================================================
-# ================= UPLOAD SELLOUT ====================
-# =====================================================
+#  UPLOAD SELLOUT 
 @sellout_bp.route('/upload', methods=['POST'])
 @token_required
 def upload_sellout():
@@ -142,63 +138,51 @@ def upload_sellout():
         file = request.files.get('file')
         username = request.form.get('username', 'system')
 
-        if not branch:
-            return jsonify({"error": "Branch wajib dipilih"}), 400
-        if not file:
-            return jsonify({"error": "File tidak ditemukan"}), 400
+        if not branch or not file:
+            return jsonify({"error": "Branch dan File wajib diisi"}), 400
 
         conn = get_db_connection()
         config = get_branch_config(branch, conn)
-
         if not config:
-            return jsonify({"error": f"Config untuk branch {branch} belum ada"}), 400
+            return jsonify({"error": f"Config branch {branch} tidak ditemukan"}), 400
 
-        ext = os.path.splitext(file.filename)[1].replace('.', '').lower()
-        if ext != config['file_extension']:
-            return jsonify({"error": "Format file tidak sesuai config"}), 400
-
-        # ===== GENERATE BATCH ID =====
-        upload_batch_id = str(uuid.uuid4())
-
+        # 1. Load & Process ke List
         df = load_file(file, config)
+        upload_batch_id = str(uuid.uuid4())
         rows = process_sellout(df, config, username, upload_batch_id)
 
         if not rows:
-            return jsonify({"error": "Tidak ada data valid"}), 400
+            return jsonify({"error": "File kosong atau tidak valid"}), 400
 
-        start_date, end_date = get_date_range(rows)
-        if not start_date or not end_date:
-            return jsonify({"error": "Invoice date tidak ditemukan"}), 400
+        # Ambil sampel tanggal dari data pertama untuk dasar penghapusan
+        sample_date = rows[0]['invoice_date']
 
-        delete_sellout_by_range(conn, branch, start_date, end_date)
+        # 2. Pembersihan Data (Hygiene Database)
+        # Hapus bulan lain di TEMP agar tabel tetap ringan
+        delete_sellout_temp_old_months(conn, sample_date)
+        
+        # Hapus bulan yang sama di FINAL agar revisi data bersih (mencegah duplikat transaksi)
+        delete_sellout_final_by_month(conn, branch, sample_date)
 
+        # 3. Simpan ke Temp & Queue
         insert_sellout(conn, rows)
-        conn.commit()
-
-        # ===== INSERT QUEUE =====
+        
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO sellout_process_queue (
-                upload_batch_id,
-                status,
-                created_at
-            )
+            INSERT INTO sellout_process_queue (upload_batch_id, status, created_at)
             VALUES (%s, 'PENDING', NOW())
         """, (upload_batch_id,))
+        
         conn.commit()
-        cur.close()
 
         return jsonify({
-            "message": "Upload sellout berhasil",
+            "message": "Upload berhasil. Data sedang diproses oleh worker.",
             "total_row": len(rows),
             "upload_batch_id": upload_batch_id
         })
 
     except Exception as e:
-        if conn:
-            conn.rollback()
+        if conn: conn.rollback()
         return jsonify({"error": str(e)}), 500
-
     finally:
-        if conn:
-            release_db_connection(conn)
+        if conn: release_db_connection(conn)

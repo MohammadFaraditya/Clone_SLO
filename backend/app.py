@@ -21,6 +21,7 @@ from routes.product.crd_mapping_product import mapping_product_bp
 from routes.product.crud_pricegroup import pricegroup_bp
 from routes.config.crud_config import config_bp
 from routes.sellout.cr_sellout import sellout_bp
+from routes.sellout.cr_mapping_error import mapping_error_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -46,6 +47,7 @@ app.register_blueprint(mapping_product_bp)
 app.register_blueprint(pricegroup_bp)
 app.register_blueprint(config_bp)
 app.register_blueprint(sellout_bp)
+app.register_blueprint(mapping_error_bp)
 
 
 

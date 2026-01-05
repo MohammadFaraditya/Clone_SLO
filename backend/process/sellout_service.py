@@ -2,9 +2,7 @@ def process_sellout_to_final(conn, upload_batch_id, batch_size=1000):
     cur = conn.cursor()
 
     while True:
-        # =====================
-        # 1️⃣ AMBIL SET ID YANG FIX
-        # =====================
+        # AMBIL SET ID YANG FIX
         cur.execute("""
             SELECT st.id
             FROM sellout_temp st
@@ -27,9 +25,7 @@ def process_sellout_to_final(conn, upload_batch_id, batch_size=1000):
         if not batch_ids:
             break
 
-        # =====================
-        # 2️⃣ INSERT KE SELLOUT (HANYA batch_ids)
-        # =====================
+        # INSERT KE SELLOUT
         cur.execute("""
             INSERT INTO sellout (
                 region_code,
@@ -148,9 +144,7 @@ def process_sellout_to_final(conn, upload_batch_id, batch_size=1000):
             WHERE st.id = ANY(%s)
         """, (batch_ids,))
 
-        # =====================
-        # 3️⃣ FLAG SUKSES (ID YANG SAMA)
-        # =====================
+        # FLAG SUKSES (ID YANG SAMA)
         cur.execute("""
             UPDATE sellout_temp
             SET flag_move = 'Y'
@@ -159,61 +153,65 @@ def process_sellout_to_final(conn, upload_batch_id, batch_size=1000):
 
         conn.commit()
 
-    # =====================
-    # 4️⃣ FAILED MAPPING (SISA FLAG_MOVE = 'N')
-    # =====================
+    # FAILED MAPPING
     cur.execute("""
         INSERT INTO mapping_error (
+            upload_batch_id,
             kodebranch,
             id_salesman,
             id_customer,
-            order_no,
-            order_date,
+            id_product,
             invoice_no,
             invoice_date,
-            id_product,
             price,
-            qty1,
-            qty2,
             qty3,
             grossamount,
             status,
             modified_date
         )
-        SELECT
+        SELECT 
+            st.upload_batch_id,
             st.kodebranch,
             st.id_salesman,
             st.id_customer,
-            st.order_no,
-            st.order_date,
+            st.id_product,
             st.invoice_no,
             st.invoice_date,
-            st.id_product,
             st.price,
-            st.qty1,
-            st.qty2,
             st.qty3,
             st.grossamount,
-            CASE
-                WHEN mb.branch_dist IS NULL THEN 'BRANCH_NOT_MAPPED'
-                WHEN ms.id_salesman_dist IS NULL THEN 'SALESMAN_NOT_MAPPED'
-                WHEN mc.custno_dist IS NULL THEN 'CUSTOMER_NOT_MAPPED'
-                WHEN mp.pcode_dist IS NULL THEN 'PRODUCT_NOT_MAPPED'
-                ELSE 'UNKNOWN_MAPPING_ERROR'
+            CASE 
+                WHEN mb.id IS NULL THEN 'BRANCH_NOT_MAPPED'
+                WHEN ms.id IS NULL THEN 'SALESMAN_NOT_MAPPED'
+                WHEN mc.id IS NULL THEN 'CUSTOMER_NOT_MAPPED'
+                WHEN mp.id IS NULL THEN 'PRODUCT_NOT_MAPPED'
+                -- PENYEBAB 21 DATA HILANG:
+                WHEN cp.id IS NULL THEN 'CUSTOMER_NOT_FOUND_IN_MASTER_PRC'
+                WHEN pg.id IS NULL THEN 'PRODUCT_NOT_FOUND_IN_PRODUCT_GROUP'
+                WHEN b.kodebranch IS NULL THEN 'BRANCH_CODE_NOT_FOUND_IN_MASTER'
+                ELSE 'UNKNOWN_REASON_CHECK_MASTER_DATA'
             END,
             NOW()
         FROM sellout_temp st
         LEFT JOIN mapping_branch mb ON st.kodebranch = mb.branch_dist
+        LEFT JOIN branch b ON mb.kodebranch = b.kodebranch
         LEFT JOIN mapping_salesman ms ON st.id_salesman = ms.id_salesman_dist
         LEFT JOIN mapping_customer mc ON st.id_customer = mc.custno_dist
+        LEFT JOIN customer_prc cp ON mc.custno = cp.custno
         LEFT JOIN mapping_product mp ON st.id_product = mp.pcode_dist
-        WHERE st.upload_batch_id = %s
+        LEFT JOIN product_group pg ON mp.pcode_prc = pg.pcode
+        WHERE st.upload_batch_id = %s 
           AND st.flag_move = 'N'
     """, (upload_batch_id,))
 
-    # =====================
-    # 5️⃣ FLAG ERROR SEBAGAI SELESAI
-    # =====================
+    # 5. Flag sisa (error) sebagai selesai
+    cur.execute("""
+        UPDATE sellout_temp 
+        SET flag_move = 'Y' 
+        WHERE upload_batch_id = %s AND flag_move = 'N'
+    """, (upload_batch_id,))
+
+    # FLAG ERROR SEBAGAI SELESAI
     cur.execute("""
         UPDATE sellout_temp
         SET flag_move = 'Y'

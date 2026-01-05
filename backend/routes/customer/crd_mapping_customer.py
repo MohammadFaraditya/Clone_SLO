@@ -88,36 +88,34 @@ def insert_mapping_customer():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # Ambil semua custno & custno_dist dari request
+    # 1. Ambil semua custno & custno_dist dari request untuk batch checking
     custnos_prc = [str(row.get("custno")).strip() for row in data]
     custnos_dist = [str(row.get("custno_dist")).strip() for row in data]
 
-    # CEK DUPLIKAT di mapping_customer
+    # 2. CEK DUPLIKAT (LOGIKA BARU)
+    # Kita cek apakah custno_dist sudah pernah di-mapping ke MANAPUN sebelumnya
     cur.execute(
-        "SELECT custno, custno_dist FROM mapping_customer WHERE custno = ANY(%s) AND custno_dist = ANY(%s)",
-        (custnos_prc, custnos_dist)
-    )
-    existing_rows = cur.fetchall()
-    existing_pairs = {(r["custno"], r["custno_dist"]) for r in existing_rows}
-
-    # Ambil data customer_prc
-    cur.execute(
-        "SELECT custno, custname, kodebranch FROM customer_prc WHERE custno = ANY(%s)",
-        (custnos_prc,)
-    )
-    customer_prc_data = {r["custno"]: r for r in cur.fetchall()}
-
-    # Ambil data customer_dist
-    cur.execute(
-        "SELECT custno_dist, custname, branch_dist FROM customer_dist WHERE custno_dist = ANY(%s)",
+        "SELECT custno_dist, custno FROM mapping_customer WHERE custno_dist = ANY(%s)",
         (custnos_dist,)
     )
+    existing_rows = cur.fetchall()
+    # Buat dictionary untuk mapping yang sudah ada: { 'KODE_DIST': 'KODE_PRC' }
+    existing_dist_map = {r["custno_dist"]: r["custno"] for r in existing_rows}
+
+    # 3. Ambil data master (Sama seperti sebelumnya)
+    cur.execute("SELECT custno, custname, kodebranch FROM customer_prc WHERE custno = ANY(%s)", (custnos_prc,))
+    customer_prc_data = {r["custno"]: r for r in cur.fetchall()}
+
+    cur.execute("SELECT custno_dist, custname, branch_dist FROM customer_dist WHERE custno_dist = ANY(%s)", (custnos_dist,))
     customer_dist_data = {r["custno_dist"]: r for r in cur.fetchall()}
 
     rows_valid = []
+    skipped_duplicate = []
     skipped_prc = []
     skipped_dist = []
-    skipped_duplicate = []
+    
+    # Set internal untuk menangani jika di dalam file upload sendiri ada ID Dist yang ganda
+    processed_in_batch = set()
 
     for row in data:
         custno = str(row.get("custno")).strip()
@@ -127,38 +125,46 @@ def insert_mapping_customer():
         createby = row.get("createby") or "SYSTEM"
         createdate = row.get("createdate") or datetime.now()
 
-        # CEK DUPLIKAT
-        if (custno, custno_dist) in existing_pairs:
-            skipped_duplicate.append((custno, custno_dist))
+        # --- VALIDASI 1: CEK DUPLIKAT DI DATABASE ---
+        if custno_dist in existing_dist_map:
+            # Jika sudah ada mapping, kita catat detailnya untuk info di frontend
+            skipped_duplicate.append({
+                "custno_dist": custno_dist,
+                "already_mapped_to": existing_dist_map[custno_dist],
+                "reason": "ID Distributor sudah ter-mapping ke Kode PRC lain"
+            })
             continue
 
-        # CEK CUSTOMER PRC
+        # --- VALIDASI 2: CEK DUPLIKAT DI DALAM FILE UPLOAD ITU SENDIRI ---
+        if custno_dist in processed_in_batch:
+            skipped_duplicate.append({
+                "custno_dist": custno_dist,
+                "reason": "ID Distributor muncul dua kali di file upload"
+            })
+            continue
+
+        # --- VALIDASI 3: CEK MASTER PRC ---
         prc_data = customer_prc_data.get(custno)
         if not prc_data or prc_data["kodebranch"] != kodebranch:
             skipped_prc.append(custno)
             continue
         custname_prc = prc_data["custname"]
 
-        # CEK CUSTOMER DIST
+        # --- VALIDASI 4: CEK MASTER DIST ---
         dist_data = customer_dist_data.get(custno_dist)
         if not dist_data or dist_data["branch_dist"] != branch_dist:
             skipped_dist.append(custno_dist)
             continue
         custname_dist = dist_data["custname"]
 
-        # Jika semua valid → tambahkan ke list insert
+        # Jika lolos semua, tambahkan ke list insert dan tandai sudah diproses
         rows_valid.append((
-            custno,
-            custname_prc,
-            custno_dist,
-            custname_dist,
-            createdate,
-            createby,
-            kodebranch,
-            branch_dist
+            custno, custname_prc, custno_dist, custname_dist, 
+            createdate, createby, kodebranch, branch_dist
         ))
+        processed_in_batch.add(custno_dist)
 
-    # INSERT DATA
+    # 4. EKSEKUSI INSERT
     inserted_count = 0
     if rows_valid:
         insert_sql = """

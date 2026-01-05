@@ -210,8 +210,10 @@ else:
                 st.session_state.collapse_sellout = not st.session_state.collapse_sellout
 
             if st.session_state.get("collapse_sellout", False):
-                if st.button("sellout", key="sellout1", use_container_width=True):
+                if st.button("Sellout", key="sellout1", use_container_width=True):
                     st.session_state.page = "sellout"; st.rerun()
+                if st.button("Mapping Error", key="sellout2", use_container_width=True):
+                    st.session_state.page = "mapping_error"; st.rerun()
 
             # USER CARD + LOGOUT
             st.markdown(f"""
@@ -403,4 +405,9 @@ else:
     elif st.session_state.page == "upload_sellout":
         from pages.sellout import upload_sellout
         upload_sellout.app()
+
+    # MAPPING ERROR
+    elif st.session_state.page == "mapping_error":
+        from pages.sellout import mapping_error_page
+        mapping_error_page.app()
 

@@ -12,7 +12,7 @@ from utils.api.sellout.sellout_api import (
 PAGE_CHUNK = 2000
 
 
-# ================= CACHE =================
+#  CACHE 
 @cache_data(ttl=600)
 def fetch_all_sellout_cached(token, kodebranch, date_from, date_to, chunk_limit=PAGE_CHUNK):
     all_data = []
@@ -53,7 +53,7 @@ def get_mapping_cached(token):
     return []
 
 
-# ================= GRID =================
+# GRID 
 def render_grid(df, grid_key):
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(
@@ -82,9 +82,9 @@ def render_grid(df, grid_key):
     return pd.DataFrame(grid_response["data"])
 
 
-# ================= MAIN =================
+# MAIN 
 def app():
-    # ================= AUTH =================
+    #  AUTH 
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠ Anda harus login terlebih dahulu.")
         st.session_state.page = "main"
@@ -92,7 +92,7 @@ def app():
 
     token = st.session_state.token
 
-    # ================= INIT STATE =================
+    #  INIT STATE
     st.session_state.setdefault("sellout_full", None)
     st.session_state.setdefault("last_kodebranch", None)
     st.session_state.setdefault("last_date_from", None)
@@ -102,23 +102,23 @@ def app():
 
     st.title("📊 Sellout Data")
 
-    # ================= UPLOAD BUTTON =================
+    #  UPLOAD BUTTON 
     if st.button("⬆️ Upload Sellout"):
         st.session_state.page = "upload_sellout"
         st.rerun()
         return
 
-    # ================= MAPPING =================
+    #  MAPPING 
     if st.session_state["mapping_sellout"] is None:
         with st.spinner("Memuat mapping region / entity / branch..."):
             st.session_state["mapping_sellout"] = get_mapping_cached(token)
 
     mapping_df = pd.DataFrame(st.session_state["mapping_sellout"])
 
-    # ================= FILTER =================
+    #  FILTER 
     with st.expander("🔍 Filter Data", expanded=True):
 
-        # ---------- REGION ----------
+        #  REGION 
         mapping_df["region_display"] = (
             mapping_df["koderegion"].fillna("") + " - " +
             mapping_df["region_name"].fillna("")
@@ -129,11 +129,11 @@ def app():
             ["(Pilih Region)"] + region_list
         )
 
-        # ---------- ENTITY ----------
+        # ENTITY 
         entity_list = []
         if selected_region != "(Pilih Region)":
             koderegion = selected_region.split(" - ")[0]
-            entity_df = mapping_df[mapping_df["koderegion"] == koderegion]
+            entity_df = mapping_df[mapping_df["koderegion"] == koderegion].copy()
             entity_df["entity_display"] = (
                 entity_df["id_entity"].fillna("") + " - " +
                 entity_df["entity_name"].fillna("")
@@ -145,11 +145,11 @@ def app():
             ["(Pilih Entity)"] + entity_list
         )
 
-        # ---------- BRANCH ----------
+        #  BRANCH 
         branch_list = []
         if selected_entity != "(Pilih Entity)":
             id_entity = selected_entity.split(" - ")[0]
-            branch_df = mapping_df[mapping_df["id_entity"] == id_entity]
+            branch_df = mapping_df[mapping_df["id_entity"] == id_entity].copy()
             branch_df["branch_display"] = (
                 branch_df["kodebranch"].fillna("") + " - " +
                 branch_df["nama_branch"].fillna("")
@@ -161,7 +161,7 @@ def app():
             ["(Pilih Branch)"] + branch_list
         )
 
-        # ---------- DATE RANGE (WAJIB) ----------
+        #  DATE RANGE (WAJIB) 
         col1, col2 = st.columns(2)
         with col1:
             date_from = st.date_input(
@@ -176,7 +176,7 @@ def app():
                 format="YYYY-MM-DD"
             )
 
-        # ---------- APPLY FILTER ----------
+        #  APPLY FILTER 
         if st.button("▶ Terapkan Filter"):
             if selected_branch == "(Pilih Branch)":
                 st.warning("⚠ Pilih branch terlebih dahulu")
@@ -206,10 +206,9 @@ def app():
                 st.session_state["grid_version"] += 1
                 st.success(f"Berhasil memuat {len(data)} data sellout")
 
-    # ================= ACTION BUTTON =================
     cols = st.columns([1, 6, 1])
 
-    # ---------- FORCE RELOAD ----------
+    #  FORCE RELOAD 
     with cols[0]:
         if st.button("🔄 Force Reload"):
             fetch_all_sellout_cached.clear()
@@ -234,7 +233,7 @@ def app():
             else:
                 st.warning("Filter belum lengkap")
 
-    # ---------- CLEAR DATA ----------
+    #  CLEAR DATA 
     with cols[2]:
         if st.button("🧹 Clear Data"):
             st.session_state["sellout_full"] = None
@@ -244,9 +243,27 @@ def app():
             st.session_state["grid_version"] += 1
             st.info("Data lokal dibersihkan")
 
-    # ================= GRID =================
+    #  GRID 
     if st.session_state.get("sellout_full"):
         df = pd.DataFrame(st.session_state["sellout_full"])
+        
+        db_columns_order = [
+            "region_code", "region_name", "entity_code", "entity_name",
+            "branch_code", "branch_name", "area_code", "area_name",
+            "salesman_code", "salesman_name", "custcode_prc", "custcode_dist",
+            "custname", "custaddress", "custcity", "sub_channel", "type_outlet",
+            "order_no", "order_date", "invoice_no", "invoice_type", "invoice_date",
+            "product_brand", "product_group1", "product_group2", "product_group3",
+            "pcode", "pcode_name", "qty1", "qty2", "qty3", "qty4", "qty5",
+            "flag_bonus", "grossamount", "discount1", "discount2", "discount3",
+            "discount4", "discount5", "discount6", "discount7", "discount8",
+            "total_discount", "dpp", "tax", "nett", "category", "vtkp", "npd",
+            "createdate", "createby", "updatedate", "updateby"
+        ]
+
+        existing_cols = [c for c in db_columns_order if c in df.columns]
+        df = df[existing_cols]
+
         df.insert(0, "No", range(1, len(df) + 1))
 
         df_view = render_grid(

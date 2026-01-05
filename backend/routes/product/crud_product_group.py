@@ -80,11 +80,22 @@ def insert_product_prc():
 
     rows = []
     pcodes = []
+    seen_in_batch = set() # Tambahan: Untuk melacak pcode unik dalam satu file upload
+    duplicate_in_file = [] # Untuk mencatat jika ada pcode ganda di file yang sama
 
     for row in data:
+        pcode = str(row.get("pcode")).strip() if row.get("pcode") else None
+        
+        if not pcode:
+            continue
+
+        # Proteksi 1: Cek apakah pcode muncul dua kali di dalam FILE yang sama
+        if pcode in seen_in_batch:
+            duplicate_in_file.append(pcode)
+            continue
+            
         group_code = row.get("group_code")
         brand = row.get("brand")
-        pcode = row.get("pcode")
         product_group_1 = row.get("product_group_1")
         product_group_2 = row.get("product_group_2")
         product_group_3 = row.get("product_group_3")
@@ -96,30 +107,29 @@ def insert_product_prc():
 
         rows.append((group_code, brand, pcode, product_group_1, product_group_2, product_group_3, category_item, vtkp, npd, createdate, createby))
         pcodes.append(pcode)
+        seen_in_batch.add(pcode)
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # Cek duplikat di product_group
+    # Proteksi 2: Cek apakah pcode sudah ada di DATABASE
     cur.execute("SELECT pcode FROM product_group WHERE pcode = ANY(%s)", (pcodes,))
     existing_group = {row["pcode"] for row in cur.fetchall()}
 
-    # Cek valid pcode di product_prc
+    # Proteksi 3: Pastikan pcode terdaftar di MASTER PRC
     cur.execute("SELECT pcode FROM product_prc WHERE pcode = ANY(%s)", (pcodes,))
     valid_prc = {row["pcode"] for row in cur.fetchall()}
 
-    # Filter rows yang valid
+    # Filter akhir sebelum insert
     rows_to_insert = [
         r for r in rows
         if r[2] not in existing_group and r[2] in valid_prc
     ]
 
-    # Hitung status
     inserted_count = len(rows_to_insert)
-    duplicate_pcode = list(existing_group)
-    invalid_pcode = list(set(pcodes) - valid_prc)
+    duplicate_pcode_db = list(existing_group)
+    invalid_pcode_master = list(set(pcodes) - valid_prc)
 
-    # Insert data
     if rows_to_insert:
         insert_sql = """
         INSERT INTO product_group
@@ -129,13 +139,15 @@ def insert_product_prc():
         execute_values(cur, insert_sql, rows_to_insert, page_size=500)
 
     conn.commit()
+    cur.close()
     release_db_connection(conn)
 
     return jsonify({
         "message": f"{inserted_count} record berhasil ditambahkan",
         "inserted": inserted_count,
-        "duplicate_in_product_group": duplicate_pcode,
-        "not_registered_in_product_prc": invalid_pcode
+        "duplicate_in_database": duplicate_pcode_db,
+        "duplicate_in_this_file": list(set(duplicate_in_file)),
+        "not_registered_in_product_prc": invalid_pcode_master
     }), 200
 
 
